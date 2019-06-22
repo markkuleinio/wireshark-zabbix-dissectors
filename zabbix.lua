@@ -22,8 +22,9 @@ zabbix_protocol.fields = { p_header, p_version, p_data_length, p_reserved, p_unc
 local default_settings =
 {
     debug_level = DEBUG,
-    ports = "10051", -- the default TCP port for Zabbix
-    reassemble = true -- whether we try reassembly or not
+    ports = "10051",   -- the default TCP port for Zabbix
+    reassemble = true, -- whether we try reassembly or not
+    info_text = true,  -- show our own Info column data or TCP defaults
 }
 
 
@@ -52,7 +53,9 @@ function doDissect(buffer, pktinfo, tree)
         info_text = "Zabbix Response, Len=" .. data_length .. " (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
     end
 
-    pktinfo.cols.info = info_text
+    if default_settings.info_text then
+        pktinfo.cols.info = info_text
+    end
 
     local subtree = tree:add(zabbix_protocol, buffer(), tree_text)
     subtree:add_le(p_header, buffer(0,4))
@@ -99,7 +102,9 @@ function doDissectCompressed(buffer, pktinfo, tree)
         info_text = "Zabbix Server Response, Len=" .. data_length .. " (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
     end
 
-    pktinfo.cols.info = info_text
+    if default_settings.info_text then
+        pktinfo.cols.info = info_text
+    end
 
     local subtree = tree:add(zabbix_protocol, buffer(), tree_text)
     subtree:add_le(p_header, buffer(0,4))
@@ -148,7 +153,9 @@ function zabbix_protocol.dissector(buffer, pktinfo, tree)
     pktinfo.cols.protocol = "Zabbix"
 
     -- set the default text for Info column, it will be overridden later if possible
-    pktinfo.cols.info = "Zabbix data"
+    if default_settings.info_text then
+        pktinfo.cols.info = "Zabbix data"
+    end
 
     -- get the protocol version and data length
     local version = buffer(4,1):uint()
@@ -202,6 +209,9 @@ zabbix_protocol.prefs.reassemble = Pref.bool("Reassemble Zabbix messages spannin
     "spanning multiple TCP segments. To use this option, you must also enable \"Allow subdissectors to " ..
     "reassemble TCP streams\" in the TCP protocol settings")
 
+zabbix_protocol.prefs.info_text = Pref.bool("Show protocol data in Info column",
+    default_settings.info_text, "Disable this to show the default TCP protocol data in the Info column")
+
 zabbix_protocol.prefs.ports = Pref.range("Port(s)", default_settings.ports, "Set the TCP port(s) for Zabbix, default is 10051", 65535)
 
 zabbix_protocol.prefs.text = Pref.statictext("This dissector is written in Lua.","")
@@ -211,6 +221,10 @@ zabbix_protocol.prefs.text = Pref.statictext("This dissector is written in Lua."
 function zabbix_protocol.prefs_changed()
     if default_settings.reassemble ~= zabbix_protocol.prefs.reassemble then
         default_settings.reassemble = zabbix_protocol.prefs.reassemble
+        -- capture file reload needed
+        reload()
+    elseif default_settings.info_text ~= zabbix_protocol.prefs.info_text then
+        default_settings.info_text = zabbix_protocol.prefs.info_text
         -- capture file reload needed
         reload()
     elseif default_settings.ports ~= zabbix_protocol.prefs.ports then

@@ -12,8 +12,9 @@ zabbixagent_protocol.fields = { p_header, p_version, p_data_length, p_reserved, 
 local default_settings =
 {
     debug_level = DEBUG,
-    ports = "10050", -- the default TCP port for Zabbix
-    reassemble = true -- whether we try reassembly or not
+    ports = "10050",   -- the default TCP port for Zabbix
+    reassemble = true, -- whether we try reassembly or not
+    info_text = true,  -- show our own Info column data instead of TCP defaults
 }
 
 
@@ -45,7 +46,9 @@ function doDissect(buffer, pktinfo, tree)
     subtree:add_le(p_reserved, buffer(9,4))
     subtree:add_le(p_data, buffer(13))
 
-    pktinfo.cols.info = info_text
+    if default_settings.info_text then
+        pktinfo.cols.info = info_text
+    end
 end
 
 
@@ -77,7 +80,9 @@ function zabbixagent_protocol.dissector(buffer, pktinfo, tree)
             -- note: only matches if there is a single TCP port in the Ports setting
             info_text = "Zabbix Passive Agent Response (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
         end
-        pktinfo.cols.info = info_text
+        if default_settings.info_text then
+            pktinfo.cols.info = info_text
+        end
         local subtree = tree:add(zabbixagent_protocol, buffer(), info_text)
         subtree:add(p_data, buffer(0))
         return pktlength
@@ -123,6 +128,9 @@ zabbixagent_protocol.prefs.reassemble = Pref.bool("Reassemble Zabbix Agent messa
     "spanning multiple TCP segments. To use this option, you must also enable \"Allow subdissectors to " ..
     "reassemble TCP streams\" in the TCP protocol settings")
 
+zabbixagent_protocol.prefs.info_text = Pref.bool("Show protocol data in Info column",
+    default_settings.info_text, "Disable this to show the default TCP protocol data in the Info column")
+
 zabbixagent_protocol.prefs.ports = Pref.range("Port(s)", default_settings.ports,
     "Set the TCP port(s) for Zabbix Agent, default is 10050", 65535)
 
@@ -133,6 +141,10 @@ zabbixagent_protocol.prefs.text = Pref.statictext("This dissector is written in 
 function zabbixagent_protocol.prefs_changed()
     if default_settings.reassemble ~= zabbixagent_protocol.prefs.reassemble then
         default_settings.reassemble = zabbixagent_protocol.prefs.reassemble
+        -- capture file reload needed
+        reload()
+    elseif default_settings.info_text ~= zabbixagent_protocol.prefs.info_text then
+        default_settings.info_text = zabbixagent_protocol.prefs.info_text
         -- capture file reload needed
         reload()
     elseif default_settings.ports ~= zabbixagent_protocol.prefs.ports then
