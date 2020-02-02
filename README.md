@@ -2,7 +2,10 @@
 
 Experimental Wireshark dissectors for Zabbix protocol.
 
-Tested with Zabbix 4.0.0 and 4.0.9 with Wireshark 2.6.x and 3.0.2.
+Tested with various versions:
+- Zabbix 4.0.0, 4.0.9, 4.0.14, 4.4.4
+- Wireshark (on 64-bit Windows) 2.6.x, 3.0.2, 3.2.1
+- (not in all combinations but to give you an idea)
 
 Use at your own risk.
 
@@ -11,5 +14,20 @@ Use at your own risk.
 1. Go to `%APPDATA%\Wireshark` folder
 2. Create "plugins" folder if it does not exist yet, and go there
 3. Create a "3.0" folder if it does not exist yet (for Wireshark version 3.0.x; for other versions, change the number accordingly)
-4. Copy the .lua files there
+4. Copy the `.lua` files there
 5. If Wireshark is already running, use **Analyze - Reload Lua Plugins** (Ctrl-Shift-L)
+6. Enable TCP setting **Allow subdissector to reassemble TCP streams**
+to give you correct output when requests/responses do not fit in one
+IP packet
+7. Edit Zabbix protocol preferences as needed (in **Preferences - Protocols**, or by right-clicking in Zabbix/ZabbixAgent packets in capture window)
+
+## Filtering hints
+
+- Passive agent connections don't offer much information for filtering, just use agent IP address if filtering on the server/proxy side
+- Use `zabbix.agent.checks == 1` to show the active agents requesting for items
+to check for
+- Use `zabbix.agent.data == 1` to show the active agents sending data to Zabbix server/proxy
+- Try `zabbix.agent.name`
+
+See the Zabbix protocol tree in captured packets to see other fields that are
+available for filtering.
