@@ -23,7 +23,8 @@ IP packet
 
 ## Filtering hints
 
-- Passive agent connections don't offer much information for filtering, just use agent IP address if filtering on the server/proxy side
+- Passive agent connections don't offer much information for filtering, just use
+agent IP address if filtering on the server/proxy side
 - Use `zabbix.agent.checks == 1` to show the active agents requesting for items
 to check for
 - Use `zabbix.agent.data == 1` to show the active agents sending data to Zabbix server/proxy
@@ -31,3 +32,14 @@ to check for
 
 See the Zabbix protocol tree in captured packets to see other fields that are
 available for filtering.
+
+## Limitations
+
+- Code assumes "compact" form of JSON (no extra spaces or line feeds)
+- Not all Zabbix component combinations have been tested or implemented
+
+## Links to relevant Zabbix documentation
+
+- https://www.zabbix.com/documentation/current/manual/appendix/items/activepassive
+- https://www.zabbix.com/documentation/current/manual/appendix/protocols/header_datalen
+- https://www.zabbix.com/documentation/current/manual/appendix/protocols/server_proxy
