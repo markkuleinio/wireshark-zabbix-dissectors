@@ -10,6 +10,8 @@ p_data = ProtoField.string("zabbix.data", "Data", base.ASCII)
 p_operation = ProtoField.string("zabbix.operation", "Operation", base.ASCII)
 p_request = ProtoField.bool("zabbix.request", "Request")
 p_response = ProtoField.bool("zabbix.response", "Response")
+p_agent_checks = ProtoField.bool("zabbix.agent.checks", "Agent Active Checks")
+p_agent_data = ProtoField.bool("zabbix.agent.data", "Agent Data")
 p_proxy_data_request = ProtoField.bool("zabbix.proxydatarequest", "Proxy Data Request")
 p_proxy_tasks_request = ProtoField.bool("zabbix.proxytasksrequest", "Proxy Tasks Request")
 p_proxy_response = ProtoField.bool("zabbix.proxyresponse", "Proxy Response")
@@ -17,6 +19,7 @@ p_server_response = ProtoField.bool("zabbix.serverresponse", "Proxy Server Respo
 
 zabbix_protocol.fields = { p_header, p_version, p_data_length, p_reserved, p_uncompressed_length,
     p_data, p_operation, p_request, p_response, 
+    p_agent_checks, p_agent_data,
     p_proxy_data_request, p_proxy_tasks_request, p_proxy_response, p_server_response }
 
 local default_settings =
@@ -37,35 +40,48 @@ function doDissect(buffer, pktinfo, tree)
     local reserved = buffer(9,4):le_uint()
     local LEN = "Len: " .. data_length
     local LEN_AND_PORTS = "Len=" .. data_length .. " (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
+    local T_AGENT = 1
+    local T_CHECKS = 2
+    local T_DATA = 3
 
     -- get the data, remove the spaces for comparison for now
-    local data_without_spaces = string.gsub(buffer(13):string(), " ", "")
+    local data = buffer(13):string()
     -- (note that we assumed that the full segment belongs to this same message)
     -- set default texts, then check for specific matches and change the texts as needed
     local operation = "Unknown"
+    local oper_agent = false
+    local oper_type = 0 -- undefined
     local tree_text = "Zabbix Protocol, " .. LEN
     local info_text = "Zabbix Protocol, " .. LEN_AND_PORTS
-    if string.find(data_without_spaces, "\"request\":\"activechecks\",") then
+    if string.find(data, "\"request\":\"active checks\",") then
         operation = "Request"
+        oper_agent = true
+        oper_type = T_CHECKS
         tree_text = "Zabbix Request for active checks, " .. LEN
         info_text = "Zabbix Request for active checks, " .. LEN_AND_PORTS
-    elseif string.find(data_without_spaces, "\"request\":\"agentdata\",") then
+    elseif string.find(data, "\"request\":\"agent data\",") then
         operation = "Request"
+        oper_agent = true
+        oper_type = T_DATA
         tree_text = "Zabbix Send agent data, " .. LEN
         info_text = "Zabbix Send agent data, " .. LEN_AND_PORTS
-    elseif string.find(data_without_spaces, "\"request\":") then
+    elseif string.find(data, "\"request\":") then
         operation = "Request"
         tree_text = "Zabbix Request, " .. LEN
         info_text = "Zabbix Request, " .. LEN_AND_PORTS
-    elseif string.find(data_without_spaces, "\"response\":\"success\",\"data\":") then
+    elseif string.find(data, "\"response\":\"success\",\"data\":") then
         operation = "Response"
+        oper_agent = true
+        oper_type = T_CHECKS
         tree_text = "Zabbix Response for active checks, " .. LEN
         info_text = "Zabbix Response for active checks, " .. LEN_AND_PORTS
-    elseif string.find(data_without_spaces, "\"response\":\"success\",\"info\":") then
+    elseif string.find(data, "\"response\":\"success\",\"info\":") then
         operation = "Response"
+        oper_agent = true
+        oper_type = T_DATA
         tree_text = "Zabbix Response for agent data, " .. LEN
         info_text = "Zabbix Response for agent data, " .. LEN_AND_PORTS
-    elseif string.find(data_without_spaces, "\"response\":") then
+    elseif string.find(data, "\"response\":") then
         operation = "Response"
         tree_text = "Zabbix Response, " .. LEN
         info_text = "Zabbix Response, " .. LEN_AND_PORTS
@@ -81,6 +97,10 @@ function doDissect(buffer, pktinfo, tree)
     subtree:add_le(p_data_length, buffer(5,4))
     subtree:add_le(p_reserved, buffer(9,4))
     local opertree = subtree:add(p_operation, operation):set_generated()
+    if oper_agent then
+        if oper_type == T_CHECKS then opertree:add(p_agent_checks,1):set_generated() else opertree:add(p_agent_checks,0):set_generated() end
+        if oper_type == T_DATA then opertree:add(p_agent_data,1):set_generated() else opertree:add(p_agent_data,0):set_generated() end
+    end
     if operation == "Request" then opertree:add(p_request,1):set_generated() else opertree:add(p_request,0):set_generated() end
     if operation == "Response" then opertree:add(p_response,1):set_generated() else opertree:add(p_response,0):set_generated() end
     subtree:add_le(p_data, buffer(13))
