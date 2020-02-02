@@ -29,6 +29,7 @@ local default_settings =
     ports = "10051",   -- the default TCP port for Zabbix
     reassemble = true, -- whether we try reassembly or not
     info_text = true,  -- show our own Info column data or TCP defaults
+    ports_in_info = true, -- show TCP ports in Info column
 }
 
 
@@ -40,7 +41,10 @@ function doDissect(buffer, pktinfo, tree)
     local data_length = buffer(5,4):le_uint()
     local reserved = buffer(9,4):le_uint()
     local LEN = "Len: " .. data_length
-    local LEN_AND_PORTS = "Len=" .. data_length .. " (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
+    local LEN_AND_PORTS = "Len=" .. data_length
+    if default_settings.ports_in_info then
+        LEN_AND_PORTS = LEN_AND_PORTS .. " (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
+    end
     local T_AGENT = 1
     local T_CHECKS = 2
     local T_DATA = 3
@@ -268,8 +272,11 @@ zabbix_protocol.prefs.reassemble = Pref.bool("Reassemble Zabbix messages spannin
     "spanning multiple TCP segments. To use this option, you must also enable \"Allow subdissectors to " ..
     "reassemble TCP streams\" in the TCP protocol settings")
 
-zabbix_protocol.prefs.info_text = Pref.bool("Show protocol data in Info column",
+zabbix_protocol.prefs.info_text = Pref.bool("Show Zabbix protocol data in Info column",
     default_settings.info_text, "Disable this to show the default TCP protocol data in the Info column")
+
+zabbix_protocol.prefs.ports_in_info = Pref.bool("Show TCP ports in Info column",
+    default_settings.ports_in_info, "Disable this to have only Zabbix data in the Info column")
 
 zabbix_protocol.prefs.ports = Pref.range("Port(s)", default_settings.ports, "Set the TCP port(s) for Zabbix, default is 10051", 65535)
 
@@ -284,6 +291,10 @@ function zabbix_protocol.prefs_changed()
         reload()
     elseif default_settings.info_text ~= zabbix_protocol.prefs.info_text then
         default_settings.info_text = zabbix_protocol.prefs.info_text
+        -- capture file reload needed
+        reload()
+    elseif default_settings.ports_in_info ~= zabbix_protocol.prefs.ports_in_info then
+        default_settings.ports_in_info = zabbix_protocol.prefs.ports_in_info
         -- capture file reload needed
         reload()
     elseif default_settings.ports ~= zabbix_protocol.prefs.ports then

@@ -15,6 +15,7 @@ local default_settings =
     ports = "10050",   -- the default TCP port for Zabbix
     reassemble = true, -- whether we try reassembly or not
     info_text = true,  -- show our own Info column data instead of TCP defaults
+    ports_in_info = true, -- show TCP ports in Info column
 }
 
 
@@ -25,18 +26,24 @@ function doDissect(buffer, pktinfo, tree)
     local data_length = buffer(5,4):le_uint()
     local reserved = buffer(9,4):le_uint()
 
-    local tree_text = "Zabbix Passive Agent, Length: " .. data_length
-    local info_text = "Zabbix Passive Agent, Len=" .. data_length .. " (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
+    local LEN = "Len: " .. data_length
+    local LEN_AND_PORTS = "Len=" .. data_length
+    if default_settings.ports_in_info then
+        LEN_AND_PORTS = LEN_AND_PORTS .. " (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
+    end
+
+    local tree_text = "Zabbix Passive Agent, " .. LEN
+    local info_text = "Zabbix Passive Agent, " .. LEN_AND_PORTS
     if pktinfo.dst_port == tonumber(default_settings.ports) then
         -- this is from server to passive agent
         -- note: only matches if there is a single TCP port in the Ports setting
-        tree_text = "Zabbix Passive Agent Request, Length: " .. data_length
-        info_text = "Zabbix Passive Agent Request, Len=" .. data_length .. " (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
+        tree_text = "Zabbix Passive Agent Request, " .. LEN
+        info_text = "Zabbix Passive Agent Request, " .. LEN_AND_PORTS
     elseif pktinfo.src_port == tonumber(default_settings.ports) then
         -- this is from passive agent to server
         -- note: only matches if there is a single TCP port in the Ports setting
-        tree_text = "Zabbix Passive Agent Response, Length: " .. data_length
-        info_text = "Zabbix Passive Agent Response, Len=" .. data_length .. " (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
+        tree_text = "Zabbix Passive Agent Response, " .. LEN
+        info_text = "Zabbix Passive Agent Response, " .. LEN_AND_PORTS
     end
 
     local subtree = tree:add(zabbixagent_protocol, buffer(), tree_text)
@@ -69,16 +76,20 @@ function zabbixagent_protocol.dissector(buffer, pktinfo, tree)
     if buffer(0,4):string() ~= "ZBXD" then
         -- no header, so this is an old-style (pre-4.0) server request or a continuation
 
+        local PORTS = ""
+        if default_settings.ports_in_info then
+            PORTS = " (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
+        end
         -- set default text, then try to guess the direction
-        local info_text = "Zabbix Passive Agent (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
+        local info_text = "Zabbix Passive Agent" .. PORTS
         if pktinfo.dst_port == tonumber(default_settings.ports) then
             -- this is from server to passive agent
             -- note: only matches if there is a single TCP port in the Ports setting
-            info_text = "Zabbix Passive Agent Request (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
+            info_text = "Zabbix Passive Agent Request" .. PORTS
         elseif pktinfo.src_port == tonumber(default_settings.ports) then
             -- this is from passive agent to server
             -- note: only matches if there is a single TCP port in the Ports setting
-            info_text = "Zabbix Passive Agent Response (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
+            info_text = "Zabbix Passive Agent Response" .. PORTS
         end
         if default_settings.info_text then
             pktinfo.cols.info = info_text
@@ -128,8 +139,11 @@ zabbixagent_protocol.prefs.reassemble = Pref.bool("Reassemble Zabbix Agent messa
     "spanning multiple TCP segments. To use this option, you must also enable \"Allow subdissectors to " ..
     "reassemble TCP streams\" in the TCP protocol settings")
 
-zabbixagent_protocol.prefs.info_text = Pref.bool("Show protocol data in Info column",
+zabbixagent_protocol.prefs.info_text = Pref.bool("Show Zabbix protocol data in Info column",
     default_settings.info_text, "Disable this to show the default TCP protocol data in the Info column")
+
+zabbixagent_protocol.prefs.ports_in_info = Pref.bool("Show TCP ports in Info column",
+    default_settings.ports_in_info, "Disable this to have only Zabbix data in the Info column")
 
 zabbixagent_protocol.prefs.ports = Pref.range("Port(s)", default_settings.ports,
     "Set the TCP port(s) for Zabbix Agent, default is 10050", 65535)
@@ -145,6 +159,10 @@ function zabbixagent_protocol.prefs_changed()
         reload()
     elseif default_settings.info_text ~= zabbixagent_protocol.prefs.info_text then
         default_settings.info_text = zabbixagent_protocol.prefs.info_text
+        -- capture file reload needed
+        reload()
+    elseif default_settings.ports_in_info ~= zabbixagent_protocol.prefs.ports_in_info then
+        default_settings.ports_in_info = zabbixagent_protocol.prefs.ports_in_info
         -- capture file reload needed
         reload()
     elseif default_settings.ports ~= zabbixagent_protocol.prefs.ports then
