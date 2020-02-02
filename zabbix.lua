@@ -71,8 +71,15 @@ function doDissect(buffer, pktinfo, tree)
         operation = "Request"
         oper_agent = true
         oper_type = T_DATA
-        tree_text = "Zabbix Send agent data, " .. LEN
-        info_text = "Zabbix Send agent data, " .. LEN_AND_PORTS
+        hostname = string.match(data, '"data":%[{"host":"(.-)"')
+        print(hostname)
+        if hostname then
+            agent_name = hostname
+        else
+            hostname = "<unknown>"
+        end
+        tree_text = "Zabbix Send agent data for \"" .. hostname .. "\", " .. LEN
+        info_text = "Zabbix Send agent data for \"" .. hostname .. "\", " .. LEN_AND_PORTS
     elseif string.find(data, '{"request":') then
         operation = "Request"
         tree_text = "Zabbix Request, " .. LEN
