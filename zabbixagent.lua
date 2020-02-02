@@ -2,7 +2,7 @@
 zabbixagent_protocol = Proto("ZabbixAgent", "Zabbix Agent Protocol")
 
 p_header = ProtoField.string("zabbixagent.header", "Header", base.ASCII)
-p_version = ProtoField.uint8("zabbixagent.version", "Version", base.DEC)
+p_version = ProtoField.uint8("zabbixagent.version", "Version", base.HEX)
 p_data_length = ProtoField.uint32("zabbixagent.len", "Length", base.DEC)
 p_reserved = ProtoField.uint32("zabbixagent.reserved", "Reserved", base.DEC)
 p_data = ProtoField.string("zabbixagent.data", "Data", base.ASCII)
@@ -63,19 +63,16 @@ function zabbixagent_protocol.dissector(buffer, pktinfo, tree)
 
     local ZBXD_HEADER_LEN = 13
     local pktlength = buffer:len()
-
-    if buffer(0,4):string() ~= "ZBXD" then
-        -- there is no ZBXD signature
-        -- maybe this is encrypted, or pre-4.0 agent protocol, or not Zabbix at all
-        -- feel free to comment out the next "return 0" line to continue, then it will just continue parsing
+    if pktlength == 0 then
         return 0
     end
 
     pktinfo.cols.protocol = "ZabbixAgent"
 
     if buffer(0,4):string() ~= "ZBXD" then
-        -- no header, so this is an old-style (pre-4.0) server request or a continuation
-
+        -- no ZBXD signature, so this is an old-style (pre-4.0) server request or a continuation,
+        -- or maybe this is encrypted, or pre-4.0 agent protocol, or not Zabbix at all
+        -- so just show the ports
         local PORTS = ""
         if default_settings.ports_in_info then
             PORTS = " (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
