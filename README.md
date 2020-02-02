@@ -37,6 +37,7 @@ available for filtering.
 
 - Code assumes "compact" form of JSON (no extra spaces or line feeds)
 - Not all Zabbix component combinations have been tested or implemented
+- Cannot dissect TLS-encypted Zabbix communication
 
 ## Links to relevant Zabbix documentation
 
