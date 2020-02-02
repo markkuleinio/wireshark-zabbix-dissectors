@@ -2,7 +2,7 @@
 zabbix_protocol = Proto("Zabbix", "Zabbix Protocol")
 
 p_header = ProtoField.string("zabbix.header", "Header", base.ASCII)
-p_version = ProtoField.uint8("zabbix.version", "Version", base.DEC)
+p_version = ProtoField.uint8("zabbix.version", "Version", base.HEX)
 p_data_length = ProtoField.uint32("zabbix.len", "Length", base.DEC)
 p_reserved = ProtoField.uint32("zabbix.reserved", "Reserved", base.DEC)
 p_uncompressed_length = ProtoField.uint32("zabbix.uncompressedlen", "Uncompressed length", base.DEC)
@@ -72,7 +72,6 @@ function doDissect(buffer, pktinfo, tree)
         oper_agent = true
         oper_type = T_DATA
         hostname = string.match(data, '"data":%[{"host":"(.-)"')
-        print(hostname)
         if hostname then
             agent_name = hostname
         else
