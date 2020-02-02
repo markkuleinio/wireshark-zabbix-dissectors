@@ -35,22 +35,40 @@ function doDissect(buffer, pktinfo, tree)
     -- get the data length and reserved fields (32-bit little-endian unsigned integers)
     local data_length = buffer(5,4):le_uint()
     local reserved = buffer(9,4):le_uint()
+    local LEN = "Len: " .. data_length
+    local LEN_AND_PORTS = "Len=" .. data_length .. " (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
 
     -- get the data, remove the spaces for comparison for now
     local data_without_spaces = string.gsub(buffer(13):string(), " ", "")
     -- (note that we assumed that the full segment belongs to this same message)
     -- set default texts, then check for specific matches and change the texts as needed
     local operation = "Unknown"
-    local tree_text = "Zabbix Protocol, Length: " .. data_length
-    local info_text = "Zabbix Protocol, Len=" .. data_length .. " (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
-    if string.find(data_without_spaces, "\"request\":") then
+    local tree_text = "Zabbix Protocol, " .. LEN
+    local info_text = "Zabbix Protocol, " .. LEN_AND_PORTS
+    if string.find(data_without_spaces, "\"request\":\"activechecks\",") then
         operation = "Request"
-        tree_text = "Zabbix Request, Length: " .. data_length
-        info_text = "Zabbix Request, Len=" .. data_length .. " (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
+        tree_text = "Zabbix Request for active checks, " .. LEN
+        info_text = "Zabbix Request for active checks, " .. LEN_AND_PORTS
+    elseif string.find(data_without_spaces, "\"request\":\"agentdata\",") then
+        operation = "Request"
+        tree_text = "Zabbix Send agent data, " .. LEN
+        info_text = "Zabbix Send agent data, " .. LEN_AND_PORTS
+    elseif string.find(data_without_spaces, "\"request\":") then
+        operation = "Request"
+        tree_text = "Zabbix Request, " .. LEN
+        info_text = "Zabbix Request, " .. LEN_AND_PORTS
+    elseif string.find(data_without_spaces, "\"response\":\"success\",\"data\":") then
+        operation = "Response"
+        tree_text = "Zabbix Response for active checks, " .. LEN
+        info_text = "Zabbix Response for active checks, " .. LEN_AND_PORTS
+    elseif string.find(data_without_spaces, "\"response\":\"success\",\"info\":") then
+        operation = "Response"
+        tree_text = "Zabbix Response for agent data, " .. LEN
+        info_text = "Zabbix Response for agent data, " .. LEN_AND_PORTS
     elseif string.find(data_without_spaces, "\"response\":") then
         operation = "Response"
-        tree_text = "Zabbix Response, Length: " .. data_length
-        info_text = "Zabbix Response, Len=" .. data_length .. " (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
+        tree_text = "Zabbix Response, " .. LEN
+        info_text = "Zabbix Response, " .. LEN_AND_PORTS
     end
 
     if default_settings.info_text then
@@ -75,31 +93,33 @@ function doDissectCompressed(buffer, pktinfo, tree)
     local original_length = buffer(9,4):le_uint()
     local uncompressed_data = buffer(13):uncompress()
     local uncompressed_data_str = uncompressed_data:string()
+    local LEN = "Len: " .. data_length
+    local LEN_AND_PORTS = "Len=" .. data_length .. " (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
 
     -- set default values, then modify them as needed:
     local operation = "(none)"
-    local tree_text = "Zabbix Protocol, Version: " .. version .. ", Len: " .. data_length
-    local info_text = "Zabbix Protocol, Version=" .. version .. ", Len=" .. data_length .. " (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
+    local tree_text = "Zabbix Protocol, Version: " .. version .. ", " .. LEN
+    local info_text = "Zabbix Protocol, Version=" .. version .. ", " .. LEN_AND_PORTS
     if string.find(uncompressed_data_str, "{\"request\":\"proxy data\"}") then
         -- {"request":"proxy data"}
         operation = "Proxy Data Request"
-        tree_text = "Zabbix Request for Passive Proxy Data, Len: " .. data_length
-        info_text = "Zabbix Request for Passive Proxy Data, Len=" .. data_length .. " (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
+        tree_text = "Zabbix Request for Passive Proxy Data, " .. LEN
+        info_text = "Zabbix Request for Passive Proxy Data, " .. LEN_AND_PORTS
     elseif string.find(uncompressed_data_str, "{\"request\":\"proxy tasks\"}") then
         -- {"request":"proxy tasks"}
         operation = "Proxy Tasks Request"
-        tree_text = "Zabbix Request for Passive Proxy Tasks, Len: " .. data_length
-        info_text = "Zabbix Request for Passive Proxy Tasks, Len=" .. data_length .. " (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
+        tree_text = "Zabbix Request for Passive Proxy Tasks, " .. LEN
+        info_text = "Zabbix Request for Passive Proxy Tasks, " .. LEN_AND_PORTS
     elseif string.find(uncompressed_data_str, "{\"session\":\"") then
         -- {"session":" ...
         operation = "Proxy Response"
-        tree_text = "Zabbix Passive Proxy Response, Len: " .. data_length
-        info_text = "Zabbix Passive Proxy Response, Len=" .. data_length .. " (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
+        tree_text = "Zabbix Passive Proxy Response, " .. LEN
+        info_text = "Zabbix Passive Proxy Response, " .. LEN_AND_PORTS
     elseif string.find(uncompressed_data_str, "{\"response\":\"") then
         -- {"response":" ...
         operation = "Server Response"
-        tree_text = "Zabbix Server Response, Len: " .. data_length
-        info_text = "Zabbix Server Response, Len=" .. data_length .. " (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
+        tree_text = "Zabbix Server Response, " .. LEN
+        info_text = "Zabbix Server Response, " .. LEN_AND_PORTS
     end
 
     if default_settings.info_text then
@@ -146,6 +166,7 @@ function zabbix_protocol.dissector(buffer, pktinfo, tree)
     if buffer(0,4):string() ~= "ZBXD" then
         -- there is no ZBXD signature
         -- maybe this is encrypted, or not Zabbix after all
+        -- print("No ZBXD header")
         return 0
     end
 
@@ -171,18 +192,19 @@ function zabbix_protocol.dissector(buffer, pktinfo, tree)
         -- dissect anyway to show something if the TCP setting "Allow subdissector to
         -- reassemble TCP streams" is disabled
         if version == 3 then
-            -- 0x01 (ZBX_TCP_PROTOCOL) + 0x02 (ZBX_TCP_COMPRESS) -> this is compressed data
             doDissectCompressed(buffer, pktinfo, tree)
         else
-            -- uncompressed (version 1) data or unknown version, just try to dissect
             doDissect(buffer, pktinfo, tree)
         end
+        -- set helpful text in Info column before returning
+        pktinfo.cols.info = "[Partial Zabbix data, enable TCP subdissector reassembly]"
         return
     end
 
     -- now we have the data to dissect, let's do it
     if version == 3 then
         -- 0x01 (ZBX_TCP_PROTOCOL) + 0x02 (ZBX_TCP_COMPRESS) -> this is compressed data
+        -- (see include/comms.h in Zabbix sources)
         doDissectCompressed(buffer, pktinfo, tree)
     else
         -- uncompressed (version 1) data or unknown version, just try to dissect
