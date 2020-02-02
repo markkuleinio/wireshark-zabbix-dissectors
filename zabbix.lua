@@ -10,6 +10,7 @@ p_data = ProtoField.string("zabbix.data", "Data", base.ASCII)
 p_operation = ProtoField.string("zabbix.operation", "Operation", base.ASCII)
 p_request = ProtoField.bool("zabbix.request", "Request")
 p_response = ProtoField.bool("zabbix.response", "Response")
+p_agent_name = ProtoField.string("zabbix.agent.name", "Agent Name", base.ASCII)
 p_agent_checks = ProtoField.bool("zabbix.agent.checks", "Agent Active Checks")
 p_agent_data = ProtoField.bool("zabbix.agent.data", "Agent Data")
 p_proxy_data_request = ProtoField.bool("zabbix.proxydatarequest", "Proxy Data Request")
@@ -19,7 +20,7 @@ p_server_response = ProtoField.bool("zabbix.serverresponse", "Proxy Server Respo
 
 zabbix_protocol.fields = { p_header, p_version, p_data_length, p_reserved, p_uncompressed_length,
     p_data, p_operation, p_request, p_response, 
-    p_agent_checks, p_agent_data,
+    p_agent_name, p_agent_checks, p_agent_data,
     p_proxy_data_request, p_proxy_tasks_request, p_proxy_response, p_server_response }
 
 local default_settings =
@@ -51,37 +52,44 @@ function doDissect(buffer, pktinfo, tree)
     local operation = "Unknown"
     local oper_agent = false
     local oper_type = 0 -- undefined
+    local agent_name = nil
     local tree_text = "Zabbix Protocol, " .. LEN
     local info_text = "Zabbix Protocol, " .. LEN_AND_PORTS
-    if string.find(data, "\"request\":\"active checks\",") then
+    if string.find(data, '{"request":"active checks",') then
         operation = "Request"
         oper_agent = true
         oper_type = T_CHECKS
-        tree_text = "Zabbix Request for active checks, " .. LEN
-        info_text = "Zabbix Request for active checks, " .. LEN_AND_PORTS
-    elseif string.find(data, "\"request\":\"agent data\",") then
+        hostname = string.match(data, '"host":"(.-)"')
+        if hostname then
+            agent_name = hostname
+        else
+            hostname = "<unknown>"
+        end
+        tree_text = "Zabbix Request for active checks for \"" .. hostname .. "\", " .. LEN
+        info_text = "Zabbix Request for active checks for \"" .. hostname .. "\", " .. LEN_AND_PORTS
+    elseif string.find(data, '{"request":"agent data",') then
         operation = "Request"
         oper_agent = true
         oper_type = T_DATA
         tree_text = "Zabbix Send agent data, " .. LEN
         info_text = "Zabbix Send agent data, " .. LEN_AND_PORTS
-    elseif string.find(data, "\"request\":") then
+    elseif string.find(data, '{"request":') then
         operation = "Request"
         tree_text = "Zabbix Request, " .. LEN
         info_text = "Zabbix Request, " .. LEN_AND_PORTS
-    elseif string.find(data, "\"response\":\"success\",\"data\":") then
+    elseif string.find(data, '{"response":"success","data":') then
         operation = "Response"
         oper_agent = true
         oper_type = T_CHECKS
         tree_text = "Zabbix Response for active checks, " .. LEN
         info_text = "Zabbix Response for active checks, " .. LEN_AND_PORTS
-    elseif string.find(data, "\"response\":\"success\",\"info\":") then
+    elseif string.find(data, '{"response":"success","info":') then
         operation = "Response"
         oper_agent = true
         oper_type = T_DATA
         tree_text = "Zabbix Response for agent data, " .. LEN
         info_text = "Zabbix Response for agent data, " .. LEN_AND_PORTS
-    elseif string.find(data, "\"response\":") then
+    elseif string.find(data, '{"response":') then
         operation = "Response"
         tree_text = "Zabbix Response, " .. LEN
         info_text = "Zabbix Response, " .. LEN_AND_PORTS
@@ -96,6 +104,9 @@ function doDissect(buffer, pktinfo, tree)
     subtree:add_le(p_version, buffer(4,1))
     subtree:add_le(p_data_length, buffer(5,4))
     subtree:add_le(p_reserved, buffer(9,4))
+    if agent_name then
+        subtree:add(p_agent_name, agent_name)
+    end
     local opertree = subtree:add(p_operation, operation):set_generated()
     if oper_agent then
         if oper_type == T_CHECKS then opertree:add(p_agent_checks,1):set_generated() else opertree:add(p_agent_checks,0):set_generated() end
