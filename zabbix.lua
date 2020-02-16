@@ -206,7 +206,10 @@ function doDissectCompressed(buffer, pktinfo, tree)
     local uncompressed_data = buffer(13):uncompress()
     local uncompressed_data_str = uncompressed_data:string()
     local LEN = "Len: " .. data_length
-    local LEN_AND_PORTS = "Len=" .. data_length .. " (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
+    local LEN_AND_PORTS = "Len=" .. data_length
+    if default_settings.ports_in_info then
+        LEN_AND_PORTS = LEN_AND_PORTS .. " (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
+    end
 
     -- set default values, then modify them as needed:
     local oper_type = -1 -- undefined
