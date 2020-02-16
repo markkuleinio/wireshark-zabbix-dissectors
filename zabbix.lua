@@ -141,14 +141,14 @@ function doDissect(buffer, pktinfo, tree)
         info_text = "Zabbix Passive Proxy Response, " .. LEN_AND_PORTS
     elseif string.find(data, '{"response":"success","data":') then
         -- response for agent's request for active checks
-        oper_type = T_CHECKS
-        tree_text = "Zabbix Response for active checks, " .. LEN
-        info_text = "Zabbix Response for active checks, " .. LEN_AND_PORTS
+        oper_type = T_SUCCESS + T_CHECKS
+        tree_text = "Zabbix Response for active checks (success), " .. LEN
+        info_text = "Zabbix Response for active checks (success), " .. LEN_AND_PORTS
     elseif string.find(data, '{"response":"success","info":') then
         -- response for agent data send
-        oper_type = T_AGENT_DATA
-        tree_text = "Zabbix Response for agent data, " .. LEN
-        info_text = "Zabbix Response for agent data, " .. LEN_AND_PORTS
+        oper_type = T_SUCCESS + T_AGENT_DATA
+        tree_text = "Zabbix Response for agent data (success), " .. LEN
+        info_text = "Zabbix Response for agent data (success), " .. LEN_AND_PORTS
     elseif string.find(data, '{"globalmacro":') then
         -- response for active proxy config request
         oper_type = T_PROXY_CONFIG
@@ -158,14 +158,14 @@ function doDissect(buffer, pktinfo, tree)
         -- response of some sort, successful
         oper_type = T_SUCCESS + T_RESPONSE
         version_string = string.match(data, '"version":"(.-)"')
-        tree_text = "Zabbix Response, " .. LEN
-        info_text = "Zabbix Response, " .. LEN_AND_PORTS
+        tree_text = "Zabbix Response (success), " .. LEN
+        info_text = "Zabbix Response (success), " .. LEN_AND_PORTS
     elseif string.find(data, '{"response":"failed"') then
         -- response of some sort, failed
         oper_type = T_FAILED + T_RESPONSE
         version_string = string.match(data, '"version":"(.-)"')
-        tree_text = "Zabbix Response, " .. LEN
-        info_text = "Zabbix Response, " .. LEN_AND_PORTS
+        tree_text = "Zabbix Response (failed), " .. LEN
+        info_text = "Zabbix Response (failed), " .. LEN_AND_PORTS
     end
 
     if default_settings.info_text then
@@ -268,14 +268,14 @@ function doDissectCompressed(buffer, pktinfo, tree)
         -- response of some sort, successful
         oper_type = T_SUCCESS + T_RESPONSE
         version_string = string.match(uncompressed_data_str, '"version":"(.-)"')
-        tree_text = "Zabbix Response, " .. LEN
-        info_text = "Zabbix Response, " .. LEN_AND_PORTS
+        tree_text = "Zabbix Response (success), " .. LEN
+        info_text = "Zabbix Response (success), " .. LEN_AND_PORTS
     elseif string.find(uncompressed_data_str, '{"response":"failed"') then
         -- response of some sort, failed
         oper_type = T_FAILED + T_RESPONSE
         version_string = string.match(uncompressed_data_str, '"version":"(.-)"')
-        tree_text = "Zabbix Response, " .. LEN
-        info_text = "Zabbix Response, " .. LEN_AND_PORTS
+        tree_text = "Zabbix Response (failed), " .. LEN
+        info_text = "Zabbix Response (failed), " .. LEN_AND_PORTS
     end
 
     if default_settings.info_text then
