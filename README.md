@@ -12,14 +12,14 @@ Use at your own risk.
 ## Install instructions for Wireshark on Windows (64-bit)
 
 1. Go to `%APPDATA%\Wireshark` folder
-2. Create "plugins" folder if it does not exist yet, and go there
-3. Create a "3.0" folder if it does not exist yet (for Wireshark version 3.0.x; for other versions, change the number accordingly)
-4. Copy the `.lua` files there
-5. If Wireshark is already running, use **Analyze - Reload Lua Plugins** (Ctrl-Shift-L)
-6. Enable TCP setting **Allow subdissector to reassemble TCP streams**
+1. Create `plugins` folder if it does not exist yet, and go there
+1. Copy the `.lua` files there (alternatively you can also create a subfolder and place the files there,
+or clone this repo under the `plugins` folder)
+1. If Wireshark is already running, use **Analyze - Reload Lua Plugins** (Ctrl-Shift-L)
+1. Enable TCP setting **Allow subdissector to reassemble TCP streams**
 to give you correct output when requests/responses do not fit in one
 IP packet
-7. Edit Zabbix protocol preferences as needed (in **Preferences - Protocols**, or by right-clicking in Zabbix/ZabbixAgent packets in capture window)
+1. Edit Zabbix protocol preferences as needed (in **Preferences - Protocols**, or by right-clicking in Zabbix/ZabbixAgent packets in capture window)
 
 ## Filtering hints
 
