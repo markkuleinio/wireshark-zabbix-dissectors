@@ -3,10 +3,12 @@ zabbix_protocol = Proto("Zabbix", "Zabbix Protocol")
 
 p_header = ProtoField.string("zabbix.header", "Header", base.ASCII)
 p_version = ProtoField.uint8("zabbix.version", "Version", base.HEX)
-p_data_length = ProtoField.uint32("zabbix.len", "Length", base.DEC)
+p_length = ProtoField.uint32("zabbix.len", "Length", base.DEC)
 p_reserved = ProtoField.uint32("zabbix.reserved", "Reserved", base.DEC)
 p_uncompressed_length = ProtoField.uint32("zabbix.uncompressedlen", "Uncompressed length", base.DEC)
 p_data = ProtoField.string("zabbix.data", "Data", base.ASCII)
+-- zabbix.datalen is derived from data length or from uncompressed length
+p_data_len = ProtoField.uint32("zabbix.datalen", "Data length", base.DEC)
 p_success = ProtoField.bool("zabbix.success", "Success")
 p_failed = ProtoField.bool("zabbix.failed", "Failed")
 p_response = ProtoField.bool("zabbix.response", "Response")
@@ -20,8 +22,8 @@ p_proxy_data = ProtoField.bool("zabbix.proxy.data", "Proxy Data")
 p_proxy_config = ProtoField.bool("zabbix.proxy.config", "Proxy Config")
 p_proxy_response = ProtoField.bool("zabbix.proxy.response", "Proxy Response")
 
-zabbix_protocol.fields = { p_header, p_version, p_data_length, p_reserved, p_uncompressed_length,
-    p_data, p_success, p_failed, p_response,
+zabbix_protocol.fields = { p_header, p_version, p_length, p_reserved, p_uncompressed_length,
+    p_data, p_data_len, p_success, p_failed, p_response,
     p_version_string, p_agent_name, p_agent_checks, p_agent_data,
     p_proxy_name, p_proxy_heartbeat, p_proxy_data, p_proxy_config,
     p_proxy_response }
@@ -175,7 +177,7 @@ function doDissect(buffer, pktinfo, tree)
     local subtree = tree:add(zabbix_protocol, buffer(), tree_text)
     subtree:add_le(p_header, buffer(0,4))
     subtree:add_le(p_version, buffer(4,1))
-    subtree:add_le(p_data_length, buffer(5,4))
+    subtree:add_le(p_length, buffer(5,4))
     subtree:add_le(p_reserved, buffer(9,4))
     if agent_name then
         subtree:add(p_agent_name, agent_name)
@@ -195,6 +197,7 @@ function doDissect(buffer, pktinfo, tree)
     if band(oper_type, T_RESPONSE) then subtree:add(p_response,1):set_generated() end
     if band(oper_type, T_SUCCESS) then subtree:add(p_success,1):set_generated() end
     if band(oper_type, T_FAILED) then subtree:add(p_failed,1):set_generated() end
+    subtree:add(p_data_len, data_length):set_generated()
     subtree:add_le(p_data, buffer(13))
 end
 
@@ -285,9 +288,9 @@ function doDissectCompressed(buffer, pktinfo, tree)
     local subtree = tree:add(zabbix_protocol, buffer(), tree_text)
     subtree:add_le(p_header, buffer(0,4))
     subtree:add_le(p_version, buffer(4,1), version, nil, "[Data is compressed]")
-    subtree:add_le(p_data_length, buffer(5,4))
+    subtree:add_le(p_length, buffer(5,4))
     subtree:add_le(p_uncompressed_length, buffer(9,4))
-    subtree:add(buffer(13),"Data (" .. buffer(13):len() .. " bytes)")
+    subtree:add(buffer(13),"Compressed data (" .. buffer(13):len() .. " bytes)")
     if proxy_name then
         subtree:add(p_proxy_name, proxy_name)
     end
@@ -301,10 +304,9 @@ function doDissectCompressed(buffer, pktinfo, tree)
     if band(oper_type, T_RESPONSE) then subtree:add(p_response,1):set_generated() end
     if band(oper_type, T_SUCCESS) then subtree:add(p_success,1):set_generated() end
     if band(oper_type, T_FAILED) then subtree:add(p_failed,1):set_generated() end
-
-    subtree:add(uncompressed_data,"[Uncompressed data]")
-
-    return
+    -- set zabbix.datalen to the uncompressed length
+    subtree:add(p_data_len, original_length, nil, "(uncompressed length)"):set_generated()
+    subtree:add(p_data, uncompressed_data)
 end
 
 -- #######################################
