@@ -2,7 +2,7 @@
 
 Experimental Wireshark dissectors for Zabbix protocol.
 
-Tested with various versions:
+Tested with various versions, like:
 - Zabbix 4.0.0, 4.0.9, 4.0.14, 4.4.4
 - Wireshark (on 64-bit Windows) 2.6.x, 3.0.2, 3.2.1
 - (not in all combinations but to give you an idea)
@@ -22,10 +22,8 @@ IP packet
 1. Edit Zabbix protocol preferences as needed (in **Preferences - Protocols**, or
 by right-clicking in Zabbix/ZabbixAgent packets in capture window)
 
-## Filtering hints
+## Usage hints
 
-- Passive agent connections don't offer much information for filtering, just use
-agent IP address if filtering on the server/proxy side
 - Use `zabbix.agent.checks == 1` to show the active agents requesting for items
 to check for
 - Use `zabbix.agent.data == 1` to show the active agents sending data to Zabbix server/proxy
@@ -36,11 +34,14 @@ compression in use or not
 See the Zabbix protocol tree in captured packets to see other fields that are
 available for filtering.
 
+TLS decryption can be used if configured properly in Wireshark and also in
+capturing (session keys are needed at least with TLS 1.3, see for example
+https://security.stackexchange.com/questions/215358/extracting-openssl-pre-master-secret-from-apache2/215397#215397).
+
 ## Limitations
 
 - Code assumes "compact" form of JSON (no extra spaces or line feeds)
 - Not all Zabbix component combinations have been tested or implemented
-- Cannot dissect TLS-encypted Zabbix communication
 
 ## Links to relevant Zabbix documentation
 

@@ -1,5 +1,8 @@
 
 zabbix_protocol = Proto("Zabbix", "Zabbix Protocol")
+-- for some reason the protocol name is shown in UPPERCASE in Protocol column
+-- (and in Proto.name), so let's define a string to override that
+local PROTOCOL_NAME = "Zabbix"
 
 p_header = ProtoField.string("zabbix.header", "Header", base.ASCII)
 p_version = ProtoField.uint8("zabbix.version", "Version", base.HEX)
@@ -56,22 +59,18 @@ end
 
 -- ###############################################################################
 function doDissect(buffer, pktinfo, tree)
-    -- dissect the actual data from the tvb buffer
-
-    -- get the data length and reserved fields (32-bit little-endian unsigned integers)
     local data_length = buffer(5,4):le_uint()
     local reserved = buffer(9,4):le_uint()
+    local data = buffer(13):string()
+    -- (note that we assumed that the full segment belongs to this same message)
     local LEN = "Len: " .. data_length
     local LEN_AND_PORTS = "Len=" .. data_length
     if default_settings.ports_in_info then
         LEN_AND_PORTS = LEN_AND_PORTS .. " (" .. pktinfo.src_port .. " → " .. pktinfo.dst_port .. ")"
     end
 
-    -- get the data, remove the spaces for comparison for now
-    local data = buffer(13):string()
-    -- (note that we assumed that the full segment belongs to this same message)
-    -- set default texts, then check for specific matches and change the texts as needed
-    local oper_type = 0
+    -- set default values, then modify them as needed:
+    local oper_type = -1 -- undefined
     local agent_name = nil
     local proxy_name = nil
     local version_string = nil
@@ -315,13 +314,7 @@ end
 function zabbix_protocol.dissector(buffer, pktinfo, tree)
     local ZBXD_HEADER_LEN = 13
     local pktlength = buffer:len()
-
-    if pktlength < ZBXD_HEADER_LEN then
-        -- cannot parse, return 0
-        return 0
-    end
-
-    if buffer(0,4):string() ~= "ZBXD" then
+    if pktlength < ZBXD_HEADER_LEN or buffer(0,4):string() ~= "ZBXD" then
         -- there is no ZBXD signature
         -- maybe this is encrypted, or not Zabbix after all
         -- print("No ZBXD header")
@@ -329,7 +322,7 @@ function zabbix_protocol.dissector(buffer, pktinfo, tree)
     end
 
     -- set Protocol column manually to get it in mixed case instead of all caps
-    pktinfo.cols.protocol = "Zabbix"
+    pktinfo.cols.protocol = PROTOCOL_NAME
 
     -- set the default text for Info column, it will be overridden later if possible
     if default_settings.info_text then
@@ -368,19 +361,20 @@ function zabbix_protocol.dissector(buffer, pktinfo, tree)
         -- uncompressed (version 1) data or unknown version, just try to dissect
         doDissect(buffer, pktinfo, tree)
     end
-
-    return
 end
 
 
 local function enableDissector()
     DissectorTable.get("tcp.port"):add(default_settings.ports, zabbix_protocol)
+    -- supports also TLS decryption if the session keys are configured in Wireshark
+    DissectorTable.get("tls.port"):add(default_settings.ports, zabbix_protocol)
 end
 -- call it now, because we're enabled by default
 enableDissector()
 
 local function disableDissector()
     DissectorTable.get("tcp.port"):remove(default_settings.ports, zabbix_protocol)
+    DissectorTable.get("tls.port"):remove(default_settings.ports, zabbix_protocol)
 end
 
 -- register our preferences
