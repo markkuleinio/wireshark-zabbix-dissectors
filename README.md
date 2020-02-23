@@ -24,23 +24,30 @@ by right-clicking in Zabbix/ZabbixAgent packets in capture window)
 
 ## Usage hints
 
+You can use the provided samples to test the dissectors. For the display filters:
+
+- Use `zabbix or zabbixagent` to show only Zabbix messages
 - Use `zabbix.agent.checks == 1` to show the active agents requesting for items
 to check for
 - Use `zabbix.agent.data == 1` to show the active agents sending data to Zabbix server/proxy
 - Try `zabbix.agent.name`
 - `zabbix.datalen` always returns the uncompressed length, regardless of
-compression in use or not
+compression or TCP reassembly in use or not
 
 See the Zabbix protocol tree in captured packets to see other fields that are
-available for filtering.
+available for filtering, or go to **View - Internals - Supported Protocols** and
+filter for Zabbix to see all the registered fields. Or just enter `zabbix.` or
+`zabbixagent.` in the display filter and browse the list.
 
 TLS decryption can be used if configured properly in Wireshark and also in
 capturing (session keys are needed at least with TLS 1.3, see for example
 https://security.stackexchange.com/questions/215358/extracting-openssl-pre-master-secret-from-apache2/215397#215397).
+The provided TLS samples include the session keys embedded in the capture files
+(https://wiki.wireshark.org/TLS#Embedding_decryption_secrets_in_a_pcapng_file).
 
 ## Limitations
 
-- Code assumes "compact" form of JSON (no extra spaces or line feeds)
+- Code assumes Zabbix-generated "compact" form of JSON (no extra spaces or line feeds)
 - Not all Zabbix component combinations have been tested or implemented
 
 ## Links to relevant Zabbix documentation
