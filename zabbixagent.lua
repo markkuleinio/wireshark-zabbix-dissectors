@@ -98,7 +98,7 @@ function zabbixagent_protocol.dissector(buffer, pktinfo, tree)
         -- or maybe this is encrypted, or not Zabbix at all
         -- pattern should match the allowed Zabbix item key format, like eth.port[123], with
         -- a newline at the end
-        local pattern = "^[%w-_.,%[%]\"]+\n$"
+        local pattern = "^[%w-_.,%[%]\"/]+\n$"
         if not string.match(buffer(0):string(), pattern) then
             -- does not look like a valid pre-4.0 passive request, just return 0 to allow
             -- other dissectors to continue
