@@ -200,7 +200,7 @@ function doDissect(buffer, pktinfo, tree)
     if band(oper_type, T_RESPONSE) then subtree:add(p_response,1):set_generated() end
     if band(oper_type, T_SUCCESS) then subtree:add(p_success,1):set_generated() end
     if band(oper_type, T_FAILED) then subtree:add(p_failed,1):set_generated() end
-    subtree:add_le(p_data, buffer(13))
+    subtree:add(p_data, buffer(13))
     subtree:add(p_data_len, data_length):set_generated()
     -- now save the timestamp or calculate response time
     if band(oper_type, T_REQUEST) then
@@ -242,7 +242,7 @@ function doDissectCompressed(buffer, pktinfo, tree)
     local info_text = "Zabbix Protocol, Version=" .. version .. ", " .. LEN_AND_PORTS
     if string.find(uncompressed_data_str, '{"request":"proxy data",') then
         -- either from server to passive proxy, or from active proxy to server
-        oper_type = T_PROXY_DATA
+        oper_type = T_PROXY_DATA + T_REQUEST
         hostname = string.match(uncompressed_data_str, '"host":"(.-)"')
         if hostname then
             proxy_name = hostname
@@ -254,7 +254,7 @@ function doDissectCompressed(buffer, pktinfo, tree)
         info_text = "Zabbix Proxy data for \"" .. hostname .. "\", " .. LEN_AND_PORTS
     elseif string.find(uncompressed_data_str, '{"request":"proxy config",') then
         -- either from server to passive proxy, or from active proxy to server
-        oper_type = T_PROXY_CONFIG
+        oper_type = T_PROXY_CONFIG + T_REQUEST
         hostname = string.match(uncompressed_data_str, '"host":"(.-)"')
         if hostname then
             proxy_name = hostname
@@ -266,7 +266,7 @@ function doDissectCompressed(buffer, pktinfo, tree)
         info_text = "Zabbix Request proxy config for \"" .. hostname .. "\", " .. LEN_AND_PORTS
     elseif string.find(uncompressed_data_str, '{"request":"proxy heartbeat",') then
         -- from active proxy to server
-        oper_type = T_PROXY_HEARTBEAT
+        oper_type = T_PROXY_HEARTBEAT + T_REQUEST
         hostname = string.match(uncompressed_data_str, '"host":"(.-)"')
         if hostname then
             proxy_name = hostname
@@ -278,13 +278,13 @@ function doDissectCompressed(buffer, pktinfo, tree)
         info_text = "Zabbix Proxy heartbeat for \"" .. hostname .. "\", " .. LEN_AND_PORTS
     elseif string.find(uncompressed_data_str, '{"session":"') then
         -- response to "proxy data" request from passive proxy
-        oper_type = T_PASSIVE_PROXY_RESPONSE
+        oper_type = T_PASSIVE_PROXY_RESPONSE + T_RESPONSE
         version_string = string.match(uncompressed_data_str, '"version":"(.-)"')
         tree_text = "Zabbix Passive Proxy Response, " .. LEN
         info_text = "Zabbix Passive Proxy Response, " .. LEN_AND_PORTS
     elseif string.find(uncompressed_data_str, '{"globalmacro":') then
         -- response for active proxy config request
-        oper_type = T_PROXY_CONFIG
+        oper_type = T_PROXY_CONFIG + T_RESPONSE
         tree_text = "Zabbix Response for proxy config, " .. LEN
         info_text = "Zabbix Response for proxy config, " .. LEN_AND_PORTS
     elseif string.find(uncompressed_data_str, '{"response":"success"') then
