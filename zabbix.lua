@@ -24,22 +24,24 @@ p_proxy_heartbeat = ProtoField.bool("zabbix.proxy.heartbeat", "Proxy Heartbeat")
 p_proxy_data = ProtoField.bool("zabbix.proxy.data", "Proxy Data")
 p_proxy_config = ProtoField.bool("zabbix.proxy.config", "Proxy Config")
 p_proxy_response = ProtoField.bool("zabbix.proxy.response", "Proxy Response")
+p_time = ProtoField.float("zabbix.time", "Time since the request was sent")
 
 zabbix_protocol.fields = { p_header, p_version, p_length, p_reserved, p_uncompressed_length,
     p_data, p_data_len, p_success, p_failed, p_response,
     p_version_string, p_agent_name, p_agent_checks, p_agent_data,
     p_proxy_name, p_proxy_heartbeat, p_proxy_data, p_proxy_config,
-    p_proxy_response }
+    p_proxy_response, p_time }
 
-local T_SUCCESS = 0x01
-local T_FAILED = 0x02
-local T_CHECKS = 0x04
-local T_AGENT_DATA = 0x08
-local T_PROXY_HEARTBEAT = 0x10
-local T_PROXY_CONFIG = 0x20
-local T_PROXY_DATA = 0x40
-local T_RESPONSE = 0x80
-local T_PASSIVE_PROXY_RESPONSE = 0x100
+local T_SUCCESS = 0x0001
+local T_FAILED = 0x0002
+local T_REQUEST = 0x0004
+local T_RESPONSE = 0x0008
+local T_CHECKS = 0x0010
+local T_AGENT_DATA = 0x0020
+local T_PROXY_HEARTBEAT = 0x0040
+local T_PROXY_CONFIG = 0x0080
+local T_PROXY_DATA = 0x0100
+local T_PASSIVE_PROXY_RESPONSE = 0x0200
 
 local default_settings =
 {
@@ -49,6 +51,8 @@ local default_settings =
     info_text = true,  -- show our own Info column data or TCP defaults
     ports_in_info = true, -- show TCP ports in Info column
 }
+
+local timestamps = {}
 
 local function band(a, b)
     if bit.band(a, b) > 0 then return true
@@ -78,7 +82,7 @@ function doDissect(buffer, pktinfo, tree)
     local info_text = "Zabbix Protocol, " .. LEN_AND_PORTS
     if string.find(data, '{"request":"active checks",') then
         -- agent requesting for active checks
-        oper_type = T_CHECKS
+        oper_type = T_CHECKS + T_REQUEST
         hostname = string.match(data, '"host":"(.-)"')
         if hostname then
             agent_name = hostname
@@ -89,7 +93,7 @@ function doDissect(buffer, pktinfo, tree)
         info_text = "Zabbix Request for active checks for \"" .. hostname .. "\", " .. LEN_AND_PORTS
     elseif string.find(data, '{"request":"agent data",') then
         -- active agent sending data
-        oper_type = T_AGENT_DATA
+        oper_type = T_AGENT_DATA + T_REQUEST
         hostname = string.match(data, '"data":%[{"host":"(.-)"')
         if hostname then
             agent_name = hostname
@@ -100,7 +104,7 @@ function doDissect(buffer, pktinfo, tree)
         info_text = "Zabbix Send agent data for \"" .. hostname .. "\", " .. LEN_AND_PORTS
     elseif string.find(data, '{"request":"proxy data",') then
         -- either from server to passive proxy, or from active proxy to server
-        oper_type = T_PROXY_DATA
+        oper_type = T_PROXY_DATA + T_REQUEST
         hostname = string.match(data, '"host":"(.-)"')
         if hostname then
             proxy_name = hostname
@@ -112,7 +116,7 @@ function doDissect(buffer, pktinfo, tree)
         info_text = "Zabbix Proxy data for \"" .. hostname .. "\", " .. LEN_AND_PORTS
     elseif string.find(data, '{"request":"proxy config",') then
         -- either from server to passive proxy, or from active proxy to server
-        oper_type = T_PROXY_CONFIG
+        oper_type = T_PROXY_CONFIG + T_REQUEST
         hostname = string.match(data, '"host":"(.-)"')
         if hostname then
             proxy_name = hostname
@@ -124,7 +128,7 @@ function doDissect(buffer, pktinfo, tree)
         info_text = "Zabbix Request proxy config for \"" .. hostname .. "\", " .. LEN_AND_PORTS
     elseif string.find(data, '{"request":"proxy heartbeat",') then
         -- from active proxy to server
-        oper_type = T_PROXY_HEARTBEAT
+        oper_type = T_PROXY_HEARTBEAT + T_REQUEST
         hostname = string.match(data, '"host":"(.-)"')
         if hostname then
             proxy_name = hostname
@@ -136,23 +140,23 @@ function doDissect(buffer, pktinfo, tree)
         info_text = "Zabbix Proxy heartbeat for \"" .. hostname .. "\", " .. LEN_AND_PORTS
     elseif string.find(data, '{"session":"') then
         -- response to "proxy data" request from passive proxy
-        oper_type = T_PASSIVE_PROXY_RESPONSE
+        oper_type = T_PASSIVE_PROXY_RESPONSE + T_RESPONSE
         version_string = string.match(uncompressed_data_str, '"version":"(.-)"')
         tree_text = "Zabbix Passive Proxy Response, " .. LEN
         info_text = "Zabbix Passive Proxy Response, " .. LEN_AND_PORTS
     elseif string.find(data, '{"response":"success","data":') then
         -- response for agent's request for active checks
-        oper_type = T_SUCCESS + T_CHECKS
+        oper_type = T_SUCCESS + T_CHECKS + T_RESPONSE
         tree_text = "Zabbix Response for active checks (success), " .. LEN
         info_text = "Zabbix Response for active checks (success), " .. LEN_AND_PORTS
     elseif string.find(data, '{"response":"success","info":') then
         -- response for agent data send
-        oper_type = T_SUCCESS + T_AGENT_DATA
+        oper_type = T_SUCCESS + T_AGENT_DATA + T_RESPONSE
         tree_text = "Zabbix Response for agent data (success), " .. LEN
         info_text = "Zabbix Response for agent data (success), " .. LEN_AND_PORTS
     elseif string.find(data, '{"globalmacro":') then
         -- response for active proxy config request
-        oper_type = T_PROXY_CONFIG
+        oper_type = T_PROXY_CONFIG + T_RESPONSE
         tree_text = "Zabbix Response for proxy config, " .. LEN
         info_text = "Zabbix Response for proxy config, " .. LEN_AND_PORTS
     elseif string.find(data, '{"response":"success"') then
@@ -196,8 +200,25 @@ function doDissect(buffer, pktinfo, tree)
     if band(oper_type, T_RESPONSE) then subtree:add(p_response,1):set_generated() end
     if band(oper_type, T_SUCCESS) then subtree:add(p_success,1):set_generated() end
     if band(oper_type, T_FAILED) then subtree:add(p_failed,1):set_generated() end
-    subtree:add(p_data_len, data_length):set_generated()
     subtree:add_le(p_data, buffer(13))
+    subtree:add(p_data_len, data_length):set_generated()
+    -- now save the timestamp or calculate response time
+    if band(oper_type, T_REQUEST) then
+        -- make hash string for the request
+        local hash_string = tostring(pktinfo.src) .. ":" .. tostring(pktinfo.src_port) ..
+            "-" .. tostring(pktinfo.dst) .. ":" .. tostring(pktinfo.dst_port)
+        -- save the request timestamp
+        timestamps[hash_string] = pktinfo.abs_ts
+    elseif band(oper_type, T_RESPONSE) then
+        -- make hash string for the response
+        local hash_string = tostring(pktinfo.dst) .. ":" .. tostring(pktinfo.dst_port) ..
+            "-" .. tostring(pktinfo.src) .. ":" .. tostring(pktinfo.src_port)
+        local request_timestamp = timestamps[hash_string]
+        if request_timestamp then
+            local response_time = pktinfo.abs_ts - request_timestamp
+            subtree:add(p_time, response_time, "Time since request:", string.format("%.6f", response_time), "seconds"):set_generated()
+        end
+    end
 end
 
 -- ###############################################################################
@@ -303,9 +324,26 @@ function doDissectCompressed(buffer, pktinfo, tree)
     if band(oper_type, T_RESPONSE) then subtree:add(p_response,1):set_generated() end
     if band(oper_type, T_SUCCESS) then subtree:add(p_success,1):set_generated() end
     if band(oper_type, T_FAILED) then subtree:add(p_failed,1):set_generated() end
+    subtree:add(p_data, uncompressed_data)
     -- set zabbix.datalen to the uncompressed length
     subtree:add(p_data_len, original_length, nil, "(uncompressed length)"):set_generated()
-    subtree:add(p_data, uncompressed_data)
+    -- now save the timestamp or calculate response time
+    if band(oper_type, T_REQUEST) then
+        -- make hash string for the request
+        local hash_string = tostring(pktinfo.src) .. ":" .. tostring(pktinfo.src_port) ..
+            "-" .. tostring(pktinfo.dst) .. ":" .. tostring(pktinfo.dst_port)
+        -- save the request timestamp
+        timestamps[hash_string] = pktinfo.abs_ts
+    elseif band(oper_type, T_RESPONSE) then
+        -- make hash string for the response
+        local hash_string = tostring(pktinfo.dst) .. ":" .. tostring(pktinfo.dst_port) ..
+            "-" .. tostring(pktinfo.src) .. ":" .. tostring(pktinfo.src_port)
+        local request_timestamp = timestamps[hash_string]
+        if request_timestamp then
+            local response_time = pktinfo.abs_ts - request_timestamp
+            subtree:add(p_time, response_time, "Time since request:", string.format("%.6f", response_time), "seconds"):set_generated()
+        end
+    end
 end
 
 -- #######################################
@@ -361,6 +399,12 @@ function zabbix_protocol.dissector(buffer, pktinfo, tree)
         -- uncompressed (version 1) data or unknown version, just try to dissect
         doDissect(buffer, pktinfo, tree)
     end
+end
+
+
+function zabbix_protocol.init()
+    -- empty the timestamps table
+    timestamps = {}
 end
 
 

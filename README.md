@@ -34,6 +34,11 @@ to check for
 - `zabbix.datalen` always returns the uncompressed length, regardless of
 compression or TCP reassembly in use or not
 
+Add a column for `zabbix.time or zabbixagent.time` to display the time between
+request and response. (You can even set it to
+`zabbix.time or zabbixagent.time or icmp.resptime or icmpv6.resptime or http.time or dns.time`
+and so on to show your other response times in the same column.)
+
 See the Zabbix protocol tree in captured packets to see other fields that are
 available for filtering, or go to **View - Internals - Supported Protocols** and
 filter for Zabbix to see all the registered fields. Or just enter `zabbix.` or

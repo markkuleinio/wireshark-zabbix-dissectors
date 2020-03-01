@@ -10,9 +10,10 @@ p_data_length = ProtoField.uint32("zabbixagent.len", "Length", base.DEC)
 p_reserved = ProtoField.uint32("zabbixagent.reserved", "Reserved", base.DEC)
 p_request = ProtoField.string("zabbixagent.request", "Requested item", base.ASCII)
 p_response = ProtoField.string("zabbixagent.response", "Response", base.ASCII)
+p_time = ProtoField.float("zabbixagent.time", "Time since the request was sent")
 
 zabbixagent_protocol.fields = {
-    p_header, p_version, p_data_length, p_reserved, p_request, p_response,
+    p_header, p_version, p_data_length, p_reserved, p_request, p_response, p_time,
 }
 
 local default_settings =
@@ -23,6 +24,8 @@ local default_settings =
     info_text = true,  -- show our own Info column data instead of TCP defaults
     ports_in_info = true, -- show TCP ports in Info column
 }
+
+local timestamps = {}
 
 
 function doDissect_pre40(buffer, pktinfo, tree)
@@ -40,6 +43,11 @@ function doDissect_pre40(buffer, pktinfo, tree)
     local subtree = tree:add(zabbixagent_protocol, buffer(), info_text)
     -- don't include the newline in the field
     subtree:add(p_request, buffer(0,pktlength-1))
+    -- make hash string for the request
+    local hash_string = tostring(pktinfo.src) .. ":" .. tostring(pktinfo.src_port) ..
+        "-" .. tostring(pktinfo.dst) .. ":" .. tostring(pktinfo.dst_port)
+    -- save the request timestamp
+    timestamps[hash_string] = pktinfo.abs_ts
 end
 
 
@@ -82,8 +90,21 @@ function doDissect(buffer, pktinfo, tree)
     subtree:add_le(p_reserved, buffer(9,4))
     if is_request then
         subtree:add(p_request, buffer(13))
+        -- make hash string for the request
+        local hash_string = tostring(pktinfo.src) .. ":" .. tostring(pktinfo.src_port) ..
+            "-" .. tostring(pktinfo.dst) .. ":" .. tostring(pktinfo.dst_port)
+        -- save the request timestamp
+        timestamps[hash_string] = pktinfo.abs_ts
     elseif is_response then
         subtree:add(p_response, buffer(13))
+        -- make hash string for the response
+        local hash_string = tostring(pktinfo.dst) .. ":" .. tostring(pktinfo.dst_port) ..
+            "-" .. tostring(pktinfo.src) .. ":" .. tostring(pktinfo.src_port)
+        local request_timestamp = timestamps[hash_string]
+        if request_timestamp then
+            local response_time = pktinfo.abs_ts - request_timestamp
+            subtree:add(p_time, response_time, "Time since request:", string.format("%.6f", response_time), "seconds"):set_generated()
+        end
     else
         subtree:add(buffer(13), "(Request or response, port was not matched)")
     end
@@ -127,6 +148,12 @@ function zabbixagent_protocol.dissector(buffer, pktinfo, tree)
         doDissect(buffer, pktinfo, tree)
     end
     return
+end
+
+
+function zabbixagent_protocol.init()
+    -- empty the timestamps table
+    timestamps = {}
 end
 
 
