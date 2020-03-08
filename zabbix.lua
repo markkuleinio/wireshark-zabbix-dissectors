@@ -60,6 +60,8 @@ local function band(a, b)
     end
 end
 
+local json_dissector = Dissector.get("json")
+
 
 -- ###############################################################################
 function doDissect(buffer, pktinfo, tree)
@@ -201,6 +203,7 @@ function doDissect(buffer, pktinfo, tree)
     if band(oper_type, T_SUCCESS) then subtree:add(p_success,1):set_generated() end
     if band(oper_type, T_FAILED) then subtree:add(p_failed,1):set_generated() end
     subtree:add(p_data, buffer(13))
+    json_dissector(buffer(13):tvb(), pktinfo, subtree)
     subtree:add(p_data_len, data_length):set_generated()
     -- now save the timestamp or calculate response time
     if band(oper_type, T_REQUEST) then
@@ -325,6 +328,7 @@ function doDissectCompressed(buffer, pktinfo, tree)
     if band(oper_type, T_SUCCESS) then subtree:add(p_success,1):set_generated() end
     if band(oper_type, T_FAILED) then subtree:add(p_failed,1):set_generated() end
     subtree:add(p_data, uncompressed_data)
+    json_dissector(uncompressed_data:tvb(), pktinfo, subtree)
     -- set zabbix.datalen to the uncompressed length
     subtree:add(p_data_len, original_length, nil, "(uncompressed length)"):set_generated()
     -- now save the timestamp or calculate response time
