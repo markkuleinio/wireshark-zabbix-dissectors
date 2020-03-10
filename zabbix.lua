@@ -35,6 +35,17 @@ zabbix_protocol.fields = { p_header, p_version, p_length, p_reserved, p_uncompre
     p_proxy_response, p_time,
 }
 
+e_unknown_use = ProtoExpert.new("zabbix.expert.unknown",
+    "Could not identify as agent or proxy connection, maybe request was not captured?",
+    expert.group.RESPONSE_CODE, expert.severity.NOTE)
+e_failed_response = ProtoExpert.new("zabbix.expert.failed",
+    "Returned response: \"failed\"",
+    expert.group.RESPONSE_CODE, expert.severity.NOTE)
+
+zabbix_protocol.experts = {
+    e_unknown_use, e_failed_response,
+}
+
 local T_SUCCESS = 0x0001
 local T_FAILED = 0x0002
 local T_REQUEST = 0x0004
@@ -240,8 +251,7 @@ function doDissect(buffer, pktinfo, tree)
     elseif proxy then
         subtree:add(p_proxy, 1, "This is a proxy connection"):set_generated()
     else
-        subtree:add("Not agent or proxy"):set_generated():
-            add_expert_info(PI_RESPONSE_CODE, PI_NOTE, "Could not identify as agent or proxy connection, maybe request was not captured?")
+        subtree:add("Not agent or proxy"):set_generated():add_proto_expert_info(e_unknown_use)
     end
     if agent_name then
         subtree:add(p_agent_name, agent_name)
@@ -273,7 +283,7 @@ function doDissect(buffer, pktinfo, tree)
     if band(oper_type, T_SUCCESS) then subtree:add(p_success,1) end
     if band(oper_type, T_FAILED) then
         subtree:add(p_failed,1)
-        subtree:add(p_data, buffer(13)):add_expert_info(PI_RESPONSE_CODE, PI_NOTE, "Returned response: \"failed\"")
+        subtree:add(p_data, buffer(13)):add_proto_expert_info(e_failed_response)
     else
         subtree:add(p_data, buffer(13))
     end
@@ -421,7 +431,7 @@ function doDissectCompressed(buffer, pktinfo, tree)
     if band(oper_type, T_SUCCESS) then subtree:add(p_success,1) end
     if band(oper_type, T_FAILED) then
         subtree:add(p_failed,1)
-        subtree:add(p_data, uncompressed_data):add_expert_info(PI_RESPONSE_CODE, PI_NOTE, "Returned response: \"failed\"")
+        subtree:add(p_data, uncompressed_data):add_proto_expert_info(e_failed_response)
     else
         subtree:add(p_data, uncompressed_data)
     end
