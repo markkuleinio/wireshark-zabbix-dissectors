@@ -9,6 +9,8 @@ Tested with various versions, like:
 
 Use at your own risk.
 
+See the commit history for the changes.
+
 ## Install instructions for Wireshark on Windows (64-bit)
 
 1. Go to `%APPDATA%\Wireshark` folder
@@ -27,7 +29,7 @@ by right-clicking in Zabbix/ZabbixAgent packets in capture window)
 You can use the provided samples to test the dissectors. For the display filters:
 
 - Use `zabbix or zabbixagent` to show only Zabbix messages
-- Use `zabbix.agent.checks == 1` to show the active agents requesting for items
+- Use `zabbix.agent.activechecks == 1` to show the active agents requesting for items
 to check for
 - Use `zabbix.agent.data == 1` to show the active agents sending data to Zabbix server/proxy
 - Try `zabbix.agent.name`
