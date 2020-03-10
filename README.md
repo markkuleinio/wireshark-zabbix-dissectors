@@ -28,11 +28,12 @@ by right-clicking in Zabbix/ZabbixAgent packets in capture window)
 
 You can use the provided samples to test the dissectors. For the display filters:
 
-- Use `zabbix or zabbixagent` to show only Zabbix messages
+- Use `zabbix or zabbixagent` to show only Zabbix protocol messages
+- Use `zabbix.agent` (or `zabbix.proxy`) to show only agent (proxy) messages
 - Use `zabbix.agent.activechecks == 1` to show the active agents requesting for items
 to check for
 - Use `zabbix.agent.data == 1` to show the active agents sending data to Zabbix server/proxy
-- Try `zabbix.agent.name`
+- Try `zabbix.agent.name` as a column
 - `zabbix.datalen` always returns the uncompressed length, regardless of
 compression or TCP reassembly in use or not
 
@@ -56,6 +57,7 @@ The provided TLS samples include the session keys embedded in the capture files
 
 - Code assumes Zabbix-generated "compact" form of JSON (no extra spaces or line feeds)
 - Not all Zabbix component combinations have been tested or implemented
+- Lua dissector performance is not as good as in C dissectors
 
 ## Links to relevant Zabbix documentation
 
