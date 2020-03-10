@@ -58,6 +58,10 @@ The provided TLS samples include the session keys embedded in the capture files
 - Code assumes Zabbix-generated "compact" form of JSON (no extra spaces or line feeds)
 - Not all Zabbix component combinations have been tested or implemented
 - Lua dissector performance is not as good as in C dissectors
+- Wireshark can/will crash if a Lua dissector field is used in a custom column, and you reload the
+Lua plugins or you change to a profile using those custom fields (workaround for the latter is
+to select the profile before opening any capture file in Wireshark); see
+http://wireshark.marwan.ma/lists/wireshark-dev/201508/msg00059.html
 
 ## Links to relevant Zabbix documentation
 
