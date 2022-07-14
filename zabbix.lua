@@ -169,7 +169,7 @@ function doDissect(buffer, pktinfo, tree)
         -- response to "proxy data" request from passive proxy
         proxy = true
         oper_type = T_PASSIVE_PROXY_RESPONSE + T_RESPONSE
-        version_string = string.match(uncompressed_data_str, '"version":"(.-)"')
+        version_string = string.match(data, '"version":"(.-)"')
         tree_text = "Zabbix Passive Proxy Response, " .. LEN
         info_text = "Zabbix Passive Proxy Response, " .. LEN_AND_PORTS
     elseif string.find(data, '{"response":"success","data":') then
