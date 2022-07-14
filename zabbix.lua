@@ -410,13 +410,13 @@ function doDissectCompressed(buffer, pktinfo, tree)
         oper_type = T_PROXY_CONFIG + T_RESPONSE
         tree_text = "Zabbix Response for proxy config, " .. LEN
         info_text = "Zabbix Response for proxy config, " .. LEN_AND_PORTS
-    elseif string.find(uncompressed_data_str, '{"response":"success"') then
+    elseif string.find(uncompressed_data_str, '"response":"success"') then
         -- response of some sort, successful
         oper_type = T_SUCCESS + T_RESPONSE
         version = string.match(uncompressed_data_str, '"version":"(.-)"')
         tree_text = "Zabbix Response (success), " .. LEN
         info_text = "Zabbix Response (success), " .. LEN_AND_PORTS
-    elseif string.find(uncompressed_data_str, '{"response":"failed"') then
+    elseif string.find(uncompressed_data_str, '"response":"failed"') then
         -- response of some sort, failed
         oper_type = T_FAILED + T_RESPONSE
         version = string.match(uncompressed_data_str, '"version":"(.-)"')
