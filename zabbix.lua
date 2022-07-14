@@ -15,7 +15,7 @@ p_data_len = ProtoField.uint32("zabbix.datalen", "Data length", base.DEC)
 p_success = ProtoField.bool("zabbix.success", "Success")
 p_failed = ProtoField.bool("zabbix.failed", "Failed")
 p_response = ProtoField.bool("zabbix.response", "Response")
-p_version_string = ProtoField.string("zabbix.versionstring", "Version String", base.ASCII)
+p_version = ProtoField.string("zabbix.version", "Version", base.ASCII)
 p_agent = ProtoField.bool("zabbix.agent", "Active Agent Connection")
 p_agent_name = ProtoField.string("zabbix.agent.name", "Agent Name", base.ASCII)
 p_agent_checks = ProtoField.bool("zabbix.agent.activechecks", "Agent Active Checks")
@@ -30,7 +30,7 @@ p_time = ProtoField.float("zabbix.time", "Time since the request was sent")
 
 zabbix_protocol.fields = { p_header, p_flags, p_length, p_reserved, p_uncompressed_length,
     p_data, p_data_len, p_success, p_failed, p_response,
-    p_version_string, p_agent, p_agent_name, p_agent_checks, p_agent_data,
+    p_version, p_agent, p_agent_name, p_agent_checks, p_agent_data,
     p_proxy, p_proxy_name, p_proxy_heartbeat, p_proxy_data, p_proxy_config,
     p_proxy_response, p_time,
 }
@@ -100,7 +100,7 @@ function doDissect(buffer, pktinfo, tree)
     local proxy = false
     local agent_name = nil
     local proxy_name = nil
-    local version_string = nil
+    local version = nil
     local tree_text = "Zabbix Protocol, " .. LEN
     local info_text = "Zabbix Protocol, " .. LEN_AND_PORTS
     if string.find(data, '{"request":"active checks",') then
@@ -137,7 +137,7 @@ function doDissect(buffer, pktinfo, tree)
         else
             hostname = "<unknown>"
         end
-        version_string = string.match(data, '"version":"(.-)"')
+        version = string.match(data, '"version":"(.-)"')
         tree_text = "Zabbix Proxy data for \"" .. hostname .. "\", " .. LEN
         info_text = "Zabbix Proxy data for \"" .. hostname .. "\", " .. LEN_AND_PORTS
     elseif string.find(data, '{"request":"proxy config",') then
@@ -150,7 +150,7 @@ function doDissect(buffer, pktinfo, tree)
         else
             hostname = "<unknown>"
         end
-        version_string = string.match(data, '"version":"(.-)"')
+        version = string.match(data, '"version":"(.-)"')
         tree_text = "Zabbix Request proxy config for \"" .. hostname .. "\", " .. LEN
         info_text = "Zabbix Request proxy config for \"" .. hostname .. "\", " .. LEN_AND_PORTS
     elseif string.find(data, '{"request":"proxy heartbeat",') then
@@ -163,14 +163,14 @@ function doDissect(buffer, pktinfo, tree)
         else
             hostname = "<unknown>"
         end
-        version_string = string.match(data, '"version":"(.-)"')
+        version = string.match(data, '"version":"(.-)"')
         tree_text = "Zabbix Proxy heartbeat for \"" .. hostname .. "\", " .. LEN
         info_text = "Zabbix Proxy heartbeat for \"" .. hostname .. "\", " .. LEN_AND_PORTS
     elseif string.find(data, '{"session":"') then
         -- response to "proxy data" request from passive proxy
         proxy = true
         oper_type = T_PASSIVE_PROXY_RESPONSE + T_RESPONSE
-        version_string = string.match(data, '"version":"(.-)"')
+        version = string.match(data, '"version":"(.-)"')
         tree_text = "Zabbix Passive Proxy Response, " .. LEN
         info_text = "Zabbix Passive Proxy Response, " .. LEN_AND_PORTS
     elseif string.find(data, '{"response":"success","data":') then
@@ -194,13 +194,13 @@ function doDissect(buffer, pktinfo, tree)
     elseif string.find(data, '{"response":"success"') then
         -- response of some sort, successful
         oper_type = T_SUCCESS + T_RESPONSE
-        version_string = string.match(data, '"version":"(.-)"')
+        version = string.match(data, '"version":"(.-)"')
         tree_text = "Zabbix Response (success), " .. LEN
         info_text = "Zabbix Response (success), " .. LEN_AND_PORTS
     elseif string.find(data, '{"response":"failed"') then
         -- response of some sort, failed
         oper_type = T_FAILED + T_RESPONSE
-        version_string = string.match(data, '"version":"(.-)"')
+        version = string.match(data, '"version":"(.-)"')
         tree_text = "Zabbix Response (failed), " .. LEN
         info_text = "Zabbix Response (failed), " .. LEN_AND_PORTS
     end
@@ -263,8 +263,8 @@ function doDissect(buffer, pktinfo, tree)
     elseif saved_proxy_name then
         subtree:add(p_proxy_name, saved_proxy_name, "Proxy name from the request:", saved_proxy_name):set_generated()
     end
-    if version_string then
-        subtree:add(p_version_string, version_string)
+    if version then
+        subtree:add(p_version, version)
     end
     if band(oper_type, T_CHECKS) then
         if band(oper_type, T_REQUEST) then subtree:add(p_agent_checks,1)
@@ -318,7 +318,7 @@ function doDissectCompressed(buffer, pktinfo, tree)
     local hostname
     local proxy = true -- all compressed connections are proxy! (as of 3/2020)
     local proxy_name = nil
-    local version_string = nil
+    local version = nil
     local tree_text = "Zabbix Protocol, Flags: " .. flags .. ", " .. LEN
     local info_text = "Zabbix Protocol, Flags=" .. flags .. ", " .. LEN_AND_PORTS
     if string.find(uncompressed_data_str, '{"request":"proxy data",') then
@@ -330,7 +330,7 @@ function doDissectCompressed(buffer, pktinfo, tree)
         else
             hostname = "<unknown>"
         end
-        version_string = string.match(uncompressed_data_str, '"version":"(.-)"')
+        version = string.match(uncompressed_data_str, '"version":"(.-)"')
         tree_text = "Zabbix Proxy data from \"" .. hostname .. "\", " .. LEN
         info_text = "Zabbix Proxy data from \"" .. hostname .. "\", " .. LEN_AND_PORTS
     elseif string.find(uncompressed_data_str, '{"request":"proxy config",') then
@@ -342,7 +342,7 @@ function doDissectCompressed(buffer, pktinfo, tree)
         else
             hostname = "<unknown>"
         end
-        version_string = string.match(uncompressed_data_str, '"version":"(.-)"')
+        version = string.match(uncompressed_data_str, '"version":"(.-)"')
         tree_text = "Zabbix Request proxy config for \"" .. hostname .. "\", " .. LEN
         info_text = "Zabbix Request proxy config for \"" .. hostname .. "\", " .. LEN_AND_PORTS
     elseif string.find(uncompressed_data_str, '{"request":"proxy heartbeat",') then
@@ -354,13 +354,13 @@ function doDissectCompressed(buffer, pktinfo, tree)
         else
             hostname = "<unknown>"
         end
-        version_string = string.match(uncompressed_data_str, '"version":"(.-)"')
+        version = string.match(uncompressed_data_str, '"version":"(.-)"')
         tree_text = "Zabbix Proxy heartbeat for \"" .. hostname .. "\", " .. LEN
         info_text = "Zabbix Proxy heartbeat for \"" .. hostname .. "\", " .. LEN_AND_PORTS
     elseif string.find(uncompressed_data_str, '{"session":"') then
         -- response to "proxy data" request from passive proxy
         oper_type = T_PASSIVE_PROXY_RESPONSE + T_RESPONSE
-        version_string = string.match(uncompressed_data_str, '"version":"(.-)"')
+        version = string.match(uncompressed_data_str, '"version":"(.-)"')
         tree_text = "Zabbix Passive Proxy Response, " .. LEN
         info_text = "Zabbix Passive Proxy Response, " .. LEN_AND_PORTS
     elseif string.find(uncompressed_data_str, '{"globalmacro":') then
@@ -371,13 +371,13 @@ function doDissectCompressed(buffer, pktinfo, tree)
     elseif string.find(uncompressed_data_str, '{"response":"success"') then
         -- response of some sort, successful
         oper_type = T_SUCCESS + T_RESPONSE
-        version_string = string.match(uncompressed_data_str, '"version":"(.-)"')
+        version = string.match(uncompressed_data_str, '"version":"(.-)"')
         tree_text = "Zabbix Response (success), " .. LEN
         info_text = "Zabbix Response (success), " .. LEN_AND_PORTS
     elseif string.find(uncompressed_data_str, '{"response":"failed"') then
         -- response of some sort, failed
         oper_type = T_FAILED + T_RESPONSE
-        version_string = string.match(uncompressed_data_str, '"version":"(.-)"')
+        version = string.match(uncompressed_data_str, '"version":"(.-)"')
         tree_text = "Zabbix Response (failed), " .. LEN
         info_text = "Zabbix Response (failed), " .. LEN_AND_PORTS
     end
@@ -422,8 +422,8 @@ function doDissectCompressed(buffer, pktinfo, tree)
     elseif saved_proxy_name then
         subtree:add(p_proxy_name, saved_proxy_name, "Proxy name from the request:", saved_proxy_name):set_generated()
     end
-    if version_string then
-        subtree:add(p_version_string, version_string)
+    if version then
+        subtree:add(p_version, version)
     end
     if band(oper_type, T_PROXY_DATA) then subtree:add(p_proxy_data,1) end
     if band(oper_type, T_PROXY_CONFIG) then subtree:add(p_proxy_config,1) end
