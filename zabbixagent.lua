@@ -5,7 +5,7 @@ zabbixagent_protocol = Proto("ZabbixAgent", "Zabbix Agent Protocol")
 local PROTOCOL_NAME = "ZabbixAgent"
 
 p_header = ProtoField.string("zabbixagent.header", "Header", base.ASCII)
-p_version = ProtoField.uint8("zabbixagent.version", "Version", base.HEX)
+p_flags = ProtoField.uint8("zabbixagent.flags", "Flags", base.HEX)
 p_data_length = ProtoField.uint32("zabbixagent.len", "Length", base.DEC)
 p_reserved = ProtoField.uint32("zabbixagent.reserved", "Reserved", base.DEC)
 p_request = ProtoField.string("zabbixagent.request", "Requested item", base.ASCII)
@@ -13,7 +13,7 @@ p_response = ProtoField.string("zabbixagent.response", "Response", base.ASCII)
 p_time = ProtoField.float("zabbixagent.time", "Time since the request was sent")
 
 zabbixagent_protocol.fields = {
-    p_header, p_version, p_data_length, p_reserved, p_request, p_response, p_time,
+    p_header, p_flags, p_data_length, p_reserved, p_request, p_response, p_time,
 }
 
 local default_settings =
@@ -85,7 +85,7 @@ function doDissect(buffer, pktinfo, tree)
     end
     local subtree = tree:add(zabbixagent_protocol, buffer(), tree_text)
     subtree:add_le(p_header, buffer(0,4))
-    subtree:add_le(p_version, buffer(4,1))
+    subtree:add_le(p_flags, buffer(4,1))
     subtree:add_le(p_data_length, buffer(5,4))
     subtree:add_le(p_reserved, buffer(9,4))
     if is_request then

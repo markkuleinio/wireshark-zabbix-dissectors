@@ -5,7 +5,7 @@ zabbix_protocol = Proto("Zabbix", "Zabbix Protocol")
 local PROTOCOL_NAME = "Zabbix"
 
 p_header = ProtoField.string("zabbix.header", "Header", base.ASCII)
-p_version = ProtoField.uint8("zabbix.version", "Version", base.HEX)
+p_flags = ProtoField.uint8("zabbix.flags", "Flags", base.HEX)
 p_length = ProtoField.uint32("zabbix.len", "Length", base.DEC)
 p_reserved = ProtoField.uint32("zabbix.reserved", "Reserved", base.DEC)
 p_uncompressed_length = ProtoField.uint32("zabbix.uncompressedlen", "Uncompressed length", base.DEC)
@@ -28,7 +28,7 @@ p_proxy_config = ProtoField.bool("zabbix.proxy.config", "Proxy Config")
 p_proxy_response = ProtoField.bool("zabbix.proxy.response", "Proxy Response")
 p_time = ProtoField.float("zabbix.time", "Time since the request was sent")
 
-zabbix_protocol.fields = { p_header, p_version, p_length, p_reserved, p_uncompressed_length,
+zabbix_protocol.fields = { p_header, p_flags, p_length, p_reserved, p_uncompressed_length,
     p_data, p_data_len, p_success, p_failed, p_response,
     p_version_string, p_agent, p_agent_name, p_agent_checks, p_agent_data,
     p_proxy, p_proxy_name, p_proxy_heartbeat, p_proxy_data, p_proxy_config,
@@ -228,7 +228,7 @@ function doDissect(buffer, pktinfo, tree)
     end
     local subtree = tree:add(zabbix_protocol, buffer(), tree_text)
     subtree:add_le(p_header, buffer(0,4))
-    subtree:add_le(p_version, buffer(4,1))
+    subtree:add_le(p_flags, buffer(4,1))
     subtree:add_le(p_length, buffer(5,4))
     subtree:add_le(p_reserved, buffer(9,4))
     local saved_agent_name = nil
@@ -302,7 +302,7 @@ end
 
 -- ###############################################################################
 function doDissectCompressed(buffer, pktinfo, tree)
-    local version = buffer(4,1):uint()
+    local flags = buffer(4,1):uint()
     local data_length = buffer(5,4):le_uint()
     local original_length = buffer(9,4):le_uint()
     local uncompressed_data = buffer(13):uncompress()
@@ -319,8 +319,8 @@ function doDissectCompressed(buffer, pktinfo, tree)
     local proxy = true -- all compressed connections are proxy! (as of 3/2020)
     local proxy_name = nil
     local version_string = nil
-    local tree_text = "Zabbix Protocol, Version: " .. version .. ", " .. LEN
-    local info_text = "Zabbix Protocol, Version=" .. version .. ", " .. LEN_AND_PORTS
+    local tree_text = "Zabbix Protocol, Flags: " .. flags .. ", " .. LEN
+    local info_text = "Zabbix Protocol, Flags=" .. flags .. ", " .. LEN_AND_PORTS
     if string.find(uncompressed_data_str, '{"request":"proxy data",') then
         -- either from server to passive proxy, or from active proxy to server
         oper_type = T_PROXY_DATA + T_REQUEST
@@ -401,7 +401,7 @@ function doDissectCompressed(buffer, pktinfo, tree)
     end
     local subtree = tree:add(zabbix_protocol, buffer(), tree_text)
     subtree:add_le(p_header, buffer(0,4))
-    subtree:add_le(p_version, buffer(4,1), version, nil, "[Data is compressed]")
+    subtree:add_le(p_flags, buffer(4,1), flags, nil, "[Data is compressed]")
     subtree:add_le(p_length, buffer(5,4))
     subtree:add_le(p_uncompressed_length, buffer(9,4))
     subtree:add(buffer(13),"Compressed data (" .. buffer(13):len() .. " bytes)")
@@ -471,10 +471,11 @@ function zabbix_protocol.dissector(buffer, pktinfo, tree)
         pktinfo.cols.info = "Zabbix data"
     end
 
-    -- get the protocol version and data length
-    local version = buffer(4,1):uint()
+    -- get the flags
+    -- "0x01 - Zabbix communications protocol, 0x02 - compression, 0x04 - large packet" (as of 7/2022)
+    local flags = buffer(4,1):uint()
     -- note the length field is only 4 bytes, verified from the Zabbix 4.0.0 sources, not 8 bytes
-    -- the 4 next bytes are "reserved", used in version 3 (compressed) as shown later
+    -- the 4 next bytes are "reserved", used in compressed data as shown later
     local data_length = buffer(5,4):le_uint()
 
     local bytes_needed = ZBXD_HEADER_LEN + data_length
@@ -484,7 +485,7 @@ function zabbix_protocol.dissector(buffer, pktinfo, tree)
         pktinfo.desegment_len = data_length + ZBXD_HEADER_LEN - pktlength
         -- dissect anyway to show something if the TCP setting "Allow subdissector to
         -- reassemble TCP streams" is disabled
-        if version == 3 then
+        if flags == 3 then
             doDissectCompressed(buffer, pktinfo, tree)
         else
             doDissect(buffer, pktinfo, tree)
@@ -495,12 +496,12 @@ function zabbix_protocol.dissector(buffer, pktinfo, tree)
     end
 
     -- now we have the data to dissect, let's do it
-    if version == 3 then
+    if flags == 3 then
         -- 0x01 (ZBX_TCP_PROTOCOL) + 0x02 (ZBX_TCP_COMPRESS) -> this is compressed data
         -- (see include/comms.h in Zabbix sources)
         doDissectCompressed(buffer, pktinfo, tree)
     else
-        -- uncompressed (version 1) data or unknown version, just try to dissect
+        -- uncompressed data or unknown version, just try to dissect
         doDissect(buffer, pktinfo, tree)
     end
 end
