@@ -9,6 +9,9 @@ p_flags = ProtoField.uint8("zabbix.flags", "Flags", base.HEX)
 p_length = ProtoField.uint32("zabbix.len", "Length", base.DEC)
 p_reserved = ProtoField.uint32("zabbix.reserved", "Reserved", base.DEC)
 p_uncompressed_length = ProtoField.uint32("zabbix.uncompressedlen", "Uncompressed length", base.DEC)
+p_large_length = ProtoField.uint64("zabbix.large.len", "Large length", base.DEC)
+p_large_reserved = ProtoField.uint64("zabbix.large.reserved", "Large reserved", base.DEC)
+p_large_uncompressed_length = ProtoField.uint64("zabbix.large.uncompressedlen", "Large uncompressed length", base.DEC)
 p_data = ProtoField.string("zabbix.data", "Data", base.ASCII)
 -- zabbix.datalen is derived from data length or from uncompressed length
 p_data_len = ProtoField.uint32("zabbix.datalen", "Data length", base.DEC)
@@ -29,6 +32,7 @@ p_proxy_response = ProtoField.bool("zabbix.proxy.response", "Proxy Response")
 p_time = ProtoField.float("zabbix.time", "Time since the request was sent")
 
 zabbix_protocol.fields = { p_header, p_flags, p_length, p_reserved, p_uncompressed_length,
+    p_large_length, p_large_reserved, p_large_uncompressed_length,
     p_data, p_data_len, p_success, p_failed, p_response,
     p_version, p_agent, p_agent_name, p_agent_checks, p_agent_data,
     p_proxy, p_proxy_name, p_proxy_heartbeat, p_proxy_data, p_proxy_config,
@@ -88,9 +92,22 @@ local json_dissector = Dissector.get("json")
 
 -- ###############################################################################
 function doDissect(buffer, pktinfo, tree)
-    local data_length = buffer(5,4):le_uint()
-    local reserved = buffer(9,4):le_uint()
-    local data = buffer(13):string()
+    local flags = buffer(4,1):uint()
+    local IS_LARGE_PACKET
+    local DATA_OFFSET
+    local data_length
+    if band(flags, FLAG_LARGE_PACKET) then
+        -- large packet has length fields as 8 bytes instead of 4 bytes,
+        -- available since 5.0.x
+        IS_LARGE_PACKET = true
+        DATA_OFFSET = 21
+        data_length = buffer(5,8):le_uint()
+    else
+        IS_LARGE_PACKET = false
+        DATA_OFFSET = 13
+        data_length = buffer(5,4):le_uint()
+    end
+    local data = buffer(DATA_OFFSET):string()
     -- (note that we assumed that the full segment belongs to this same message)
     local LEN = "Len: " .. data_length
     local LEN_AND_PORTS = "Len=" .. data_length
@@ -234,8 +251,13 @@ function doDissect(buffer, pktinfo, tree)
     local subtree = tree:add(zabbix_protocol, buffer(), tree_text)
     subtree:add_le(p_header, buffer(0,4))
     subtree:add_le(p_flags, buffer(4,1))
-    subtree:add_le(p_length, buffer(5,4))
-    subtree:add_le(p_reserved, buffer(9,4))
+    if IS_LARGE_PACKET then
+        subtree:add_le(p_large_length, buffer(5,8))
+        subtree:add_le(p_large_reserved, buffer(13,8))
+    else
+        subtree:add_le(p_length, buffer(5,4))
+        subtree:add_le(p_reserved, buffer(9,4))
+    end
     local saved_agent_name = nil
     local saved_proxy_name = nil
     if band(oper_type, T_RESPONSE) then
@@ -289,11 +311,11 @@ function doDissect(buffer, pktinfo, tree)
     if band(oper_type, T_SUCCESS) then subtree:add(p_success,1) end
     if band(oper_type, T_FAILED) then
         subtree:add(p_failed,1)
-        subtree:add(p_data, buffer(13)):add_proto_expert_info(e_failed_response)
+        subtree:add(p_data, buffer(DATA_OFFSET)):add_proto_expert_info(e_failed_response)
     else
-        subtree:add(p_data, buffer(13))
+        subtree:add(p_data, buffer(DATA_OFFSET))
     end
-    json_dissector(buffer(13):tvb(), pktinfo, subtree)
+    json_dissector(buffer(DATA_OFFSET):tvb(), pktinfo, subtree)
     subtree:add(p_data_len, data_length):set_generated()
     -- calculate and output the response time
     if band(oper_type, T_RESPONSE) then
@@ -308,9 +330,24 @@ end
 -- ###############################################################################
 function doDissectCompressed(buffer, pktinfo, tree)
     local flags = buffer(4,1):uint()
-    local data_length = buffer(5,4):le_uint()
-    local original_length = buffer(9,4):le_uint()
-    local uncompressed_data = buffer(13):uncompress()
+    local IS_LARGE_PACKET
+    local DATA_OFFSET
+    local data_length
+    local original_length
+    if band(flags, FLAG_LARGE_PACKET) then
+        -- large packet has length fields as 8 bytes instead of 4 bytes,
+        -- available since 5.0.x
+        IS_LARGE_PACKET = true
+        DATA_OFFSET = 21
+        data_length = buffer(5,8):le_uint()
+        original_length = buffer(13,8):le_uint()
+    else
+        IS_LARGE_PACKET = false
+        DATA_OFFSET = 13
+        data_length = buffer(5,4):le_uint()
+        original_length = buffer(9,4):le_uint()
+    end
+    local uncompressed_data = buffer(DATA_OFFSET):uncompress()
     local uncompressed_data_str = uncompressed_data:string()
     local LEN = "Len: " .. data_length
     local LEN_AND_PORTS = "Len=" .. data_length
@@ -407,9 +444,14 @@ function doDissectCompressed(buffer, pktinfo, tree)
     local subtree = tree:add(zabbix_protocol, buffer(), tree_text)
     subtree:add_le(p_header, buffer(0,4))
     subtree:add_le(p_flags, buffer(4,1), flags, nil, "[Data is compressed]")
-    subtree:add_le(p_length, buffer(5,4))
-    subtree:add_le(p_uncompressed_length, buffer(9,4))
-    subtree:add(buffer(13),"Compressed data (" .. buffer(13):len() .. " bytes)")
+    if IS_LARGE_PACKET then
+        subtree:add_le(p_large_length, buffer(5,8))
+        subtree:add_le(p_large_uncompressed_length, buffer(13,8))
+    else
+        subtree:add_le(p_length, buffer(5,4))
+        subtree:add_le(p_uncompressed_length, buffer(9,4))
+    end
+    subtree:add(buffer(DATA_OFFSET), "Compressed data (" .. buffer(DATA_OFFSET):len() .. " bytes)")
     local saved_proxy_name = nil
     if band(oper_type, T_RESPONSE) then
         -- make hash string for the response
@@ -459,13 +501,29 @@ end
 -- protocol dissector function
 -- #######################################
 function zabbix_protocol.dissector(buffer, pktinfo, tree)
-    local ZBXD_HEADER_LEN = 13
     local pktlength = buffer:len()
-    if pktlength < ZBXD_HEADER_LEN or buffer(0,4):string() ~= "ZBXD" then
+    if pktlength < 13 or buffer(0,4):string() ~= "ZBXD" then
         -- there is no ZBXD signature
         -- maybe this is encrypted, or not Zabbix after all
         -- print("No ZBXD header")
         return 0
+    end
+    -- get the flags
+    -- "0x01 - Zabbix communications protocol, 0x02 - compression, 0x04 - large packet" (as of 7/2022)
+    local flags = buffer(4,1):uint()
+    if not band(flags, FLAG_ZABBIX_COMMUNICATIONS) then
+        -- the 0x01 flag is not set so let's stop
+        return 0
+    end
+    local ZBXD_HEADER_LEN
+    local IS_LARGE_PACKET
+    if band(flags, FLAG_LARGE_PACKET) then
+        IS_LARGE_PACKET = true
+        -- the length fields are now 8 bytes instead of 4 bytes
+        ZBXD_HEADER_LEN = 21
+    else
+        IS_LARGE_PACKET = false
+        ZBXD_HEADER_LEN = 13
     end
 
     -- set Protocol column manually to get it in mixed case instead of all caps
@@ -476,12 +534,12 @@ function zabbix_protocol.dissector(buffer, pktinfo, tree)
         pktinfo.cols.info = "Zabbix data"
     end
 
-    -- get the flags
-    -- "0x01 - Zabbix communications protocol, 0x02 - compression, 0x04 - large packet" (as of 7/2022)
-    local flags = buffer(4,1):uint()
-    -- note the length field is only 4 bytes, verified from the Zabbix 4.0.0 sources, not 8 bytes
-    -- the 4 next bytes are "reserved", used in compressed data as shown later
-    local data_length = buffer(5,4):le_uint()
+    local data_length
+    if IS_LARGE_PACKET then
+        data_length = buffer(5,8):le_uint()
+    else
+        data_length = buffer(5,4):le_uint()
+    end
 
     local bytes_needed = ZBXD_HEADER_LEN + data_length
     if bytes_needed > pktlength and default_settings.reassemble then
