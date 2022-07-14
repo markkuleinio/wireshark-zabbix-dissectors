@@ -95,6 +95,7 @@ function doDissect(buffer, pktinfo, tree)
 
     -- set default values, then modify them as needed:
     local oper_type = 0 -- undefined
+    local hostname
     local agent = false
     local proxy = false
     local agent_name = nil
@@ -314,6 +315,7 @@ function doDissectCompressed(buffer, pktinfo, tree)
 
     -- set default values, then modify them as needed:
     local oper_type = 0 -- undefined
+    local hostname
     local proxy = true -- all compressed connections are proxy! (as of 3/2020)
     local proxy_name = nil
     local version_string = nil
