@@ -57,6 +57,11 @@ local T_PROXY_CONFIG = 0x0080
 local T_PROXY_DATA = 0x0100
 local T_PASSIVE_PROXY_RESPONSE = 0x0200
 
+-- flags in Zabbix protocol header
+local FLAG_ZABBIX_COMMUNICATIONS = 0x01
+local FLAG_COMPRESSED = 0x02
+local FLAG_LARGE_PACKET = 0x04
+
 local default_settings =
 {
     debug_level = DEBUG,
