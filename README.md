@@ -3,8 +3,8 @@
 Experimental Wireshark dissectors for Zabbix protocol.
 
 Tested with various versions, like:
-- Zabbix 4.0.0, 4.0.9, 4.0.14, 4.4.4
-- Wireshark (on 64-bit Windows) 2.6.x, 3.0.2, 3.2.1
+- Zabbix 4.0.0, 4.0.9, 4.0.14, 4.4.4, 6.2.0
+- Wireshark (on 64-bit Windows) 2.6.x, 3.0.2, 3.2.1, 3.6.6
 - (not in all combinations but to give you an idea)
 
 Use at your own risk.
@@ -57,6 +57,8 @@ The provided TLS samples include the session keys embedded in the capture files
 
 - Code assumes Zabbix-generated "compact" form of JSON (no extra spaces or line feeds)
 - Not all Zabbix component combinations have been tested or implemented
+- Large packet support (used for multi-gigabyte proxy configurations as of 7/2022) is implemented
+with separate `zabbix.large.*` fields
 - Lua dissector performance is not as good as in C dissectors
 - Wireshark can/will crash if a Lua dissector field is used in a custom column, and you reload the
 Lua plugins or you change to a profile using those custom fields (workaround for the latter is
