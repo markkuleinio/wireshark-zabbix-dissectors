@@ -56,10 +56,11 @@ local T_REQUEST = 0x0004
 local T_RESPONSE = 0x0008
 local T_CHECKS = 0x0010
 local T_AGENT_DATA = 0x0020
-local T_PROXY_HEARTBEAT = 0x0040
-local T_PROXY_CONFIG = 0x0080
-local T_PROXY_DATA = 0x0100
-local T_PASSIVE_PROXY_RESPONSE = 0x0200
+local T_AGENT_HEARTBEAT = 0x0040
+local T_PROXY_HEARTBEAT = 0x0080
+local T_PROXY_CONFIG = 0x0100
+local T_PROXY_DATA = 0x0200
+local T_PASSIVE_PROXY_RESPONSE = 0x0400
 
 -- flags in Zabbix protocol header
 local FLAG_ZABBIX_COMMUNICATIONS = 0x01
@@ -149,6 +150,18 @@ function doDissect(buffer, pktinfo, tree)
         end
         tree_text = "Zabbix Send agent data from \"" .. hostname .. "\", " .. LEN
         info_text = "Zabbix Send agent data from \"" .. hostname .. "\", " .. LEN_AND_PORTS
+    elseif string.find(data, '{"request":"active check heartbeat",') then
+        -- active agent sending heartbeats
+        agent = true
+        oper_type = T_AGENT_HEARTBEAT + T_REQUEST
+        hostname = string.match(data, '"host":"(.-)"')
+        if hostname then
+            agent_name = hostname
+        else
+            hostname = "<unknown>"
+        end
+        tree_text = "Zabbix Agent heartbeat from \"" .. hostname .. "\", " .. LEN
+        info_text = "Zabbix Agent heartbeat from \"" .. hostname .. "\", " .. LEN_AND_PORTS
     elseif string.find(data, '{"request":"proxy data",') then
         -- either from server to passive proxy, or from active proxy to server
         proxy = true
