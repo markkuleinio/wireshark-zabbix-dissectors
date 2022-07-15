@@ -1,4 +1,4 @@
-local VERSION = "2022-07-15.2-dev"
+local VERSION = "2022-07-15.2"
 zabbix_protocol = Proto("Zabbix", "Zabbix Protocol")
 -- for some reason the protocol name is shown in UPPERCASE in Protocol column
 -- (and in Proto.name), so let's define a string to override that
