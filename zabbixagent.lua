@@ -1,4 +1,4 @@
-
+local VERSION = "2022-07-15.1"
 zabbixagent_protocol = Proto("ZabbixAgent", "Zabbix Agent Protocol")
 -- for some reason the protocol name is shown in UPPERCASE in Protocol column
 -- (and in Proto.name), so let's define a string to override that
@@ -185,7 +185,7 @@ zabbixagent_protocol.prefs.ports_in_info = Pref.bool("Show TCP ports in Info col
 zabbixagent_protocol.prefs.ports = Pref.range("Port(s)", default_settings.ports,
     "Set the TCP port(s) for Zabbix Agent, default is 10050", 65535)
 
-zabbixagent_protocol.prefs.text = Pref.statictext("This dissector is written in Lua.","")
+zabbixagent_protocol.prefs.text = Pref.statictext("This dissector is written in Lua by Markku Leiniö. Version: " .. VERSION, "")
 
 
 -- the function for handling preferences being changed
