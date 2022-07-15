@@ -1,4 +1,4 @@
-local VERSION = "2022-07-15.1"
+local VERSION = "2022-07-15.2-dev"
 zabbix_protocol = Proto("Zabbix", "Zabbix Protocol")
 -- for some reason the protocol name is shown in UPPERCASE in Protocol column
 -- (and in Proto.name), so let's define a string to override that
@@ -19,6 +19,7 @@ p_success = ProtoField.bool("zabbix.success", "Success")
 p_failed = ProtoField.bool("zabbix.failed", "Failed")
 p_response = ProtoField.bool("zabbix.response", "Response")
 p_version = ProtoField.string("zabbix.version", "Version", base.ASCII)
+p_session = ProtoField.string("zabbix.session", "Session", base.ASCII)
 p_agent = ProtoField.bool("zabbix.agent", "Active Agent Connection")
 p_agent_name = ProtoField.string("zabbix.agent.name", "Agent Name", base.ASCII)
 p_agent_checks = ProtoField.bool("zabbix.agent.activechecks", "Agent Active Checks")
@@ -34,7 +35,7 @@ p_time = ProtoField.float("zabbix.time", "Time since the request was sent")
 zabbix_protocol.fields = { p_header, p_flags, p_length, p_reserved, p_uncompressed_length,
     p_large_length, p_large_reserved, p_large_uncompressed_length,
     p_data, p_data_len, p_success, p_failed, p_response,
-    p_version, p_agent, p_agent_name, p_agent_checks, p_agent_data,
+    p_version, p_session, p_agent, p_agent_name, p_agent_checks, p_agent_data,
     p_proxy, p_proxy_name, p_proxy_heartbeat, p_proxy_data, p_proxy_config,
     p_proxy_response, p_time,
 }
@@ -136,6 +137,7 @@ local function doDissect(buffer, pktinfo, tree)
     local agent_name = nil
     local proxy_name = nil
     local version = nil
+    local session = nil
     local tree_text = "Zabbix Protocol, Flags: " .. flags .. ", " .. LEN
     local info_text = "Zabbix Protocol, Flags=" .. flags .. ", " .. LEN_AND_PORTS
 
@@ -170,6 +172,10 @@ local function doDissect(buffer, pktinfo, tree)
         end
         tree_text = "Zabbix Send agent data from \"" .. hostname .. "\", " .. LEN
         info_text = "Zabbix Send agent data from \"" .. hostname .. "\", " .. LEN_AND_PORTS
+        session = string.match(data_str, '{"request":"agent data","session":"(.-)"')
+        if not session then
+            session = string.match(data_str, '"data":%[.*%].*"session":"(.-)"')
+        end
     elseif string.find(data_str, '{"request":"active check heartbeat",') then
         -- active agent sending heartbeats
         agent = true
@@ -344,6 +350,7 @@ local function doDissect(buffer, pktinfo, tree)
     else
         subtree:add("Not agent or proxy"):set_generated():add_proto_expert_info(e_unknown_use)
     end
+    if session then subtree:add(p_session, session) end
     if agent_name then
         subtree:add(p_agent_name, agent_name)
     elseif proxy_name then
