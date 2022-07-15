@@ -200,12 +200,6 @@ local function doDissect(buffer, pktinfo, tree)
         oper_type = T_SUCCESS + T_AGENT_DATA + T_RESPONSE
         tree_text = "Zabbix Response for agent data (success), " .. LEN
         info_text = "Zabbix Response for agent data (success), " .. LEN_AND_PORTS
-    elseif string.find(data_str, '{"globalmacro":') then
-        -- response for active proxy config request
-        proxy = true
-        oper_type = T_PROXY_CONFIG + T_RESPONSE
-        tree_text = "Zabbix Response for proxy config, " .. LEN
-        info_text = "Zabbix Response for proxy config, " .. LEN_AND_PORTS
     elseif string.find(data_str, '{"request":"proxy data",') then
         -- from active proxy to server
         proxy = true
@@ -232,13 +226,16 @@ local function doDissect(buffer, pktinfo, tree)
         oper_type = T_PROXY_CONFIG + T_REQUEST
         local hostname = string.match(data_str, '"host":"(.-)"')
         if hostname then
+            -- this is active proxy requesting config
             proxy_name = hostname
+            version = string.match(data_str, '"version":"(.-)"')
+            tree_text = "Zabbix Request proxy config for \"" .. hostname .. "\", " .. LEN
+            info_text = "Zabbix Request proxy config for \"" .. hostname .. "\", " .. LEN_AND_PORTS
         else
-            hostname = "<unknown>"
+            -- this is server sending config to passive proxy
+            tree_text = "Zabbix Send proxy config to passive proxy, " .. LEN
+            info_text = "Zabbix Send proxy config to passive proxy, " .. LEN_AND_PORTS
         end
-        version = string.match(data_str, '"version":"(.-)"')
-        tree_text = "Zabbix Request proxy config for \"" .. hostname .. "\", " .. LEN
-        info_text = "Zabbix Request proxy config for \"" .. hostname .. "\", " .. LEN_AND_PORTS
     elseif string.find(data_str, '{"request":"proxy heartbeat",') then
         -- from active proxy to server
         proxy = true
@@ -252,6 +249,12 @@ local function doDissect(buffer, pktinfo, tree)
         version = string.match(data_str, '"version":"(.-)"')
         tree_text = "Zabbix Proxy heartbeat for \"" .. hostname .. "\", " .. LEN
         info_text = "Zabbix Proxy heartbeat for \"" .. hostname .. "\", " .. LEN_AND_PORTS
+    elseif string.find(data_str, '{"globalmacro":') then
+        -- response for active proxy config request
+        proxy = true
+        oper_type = T_PROXY_CONFIG + T_RESPONSE
+        tree_text = "Zabbix Response for proxy config, " .. LEN
+        info_text = "Zabbix Response for proxy config, " .. LEN_AND_PORTS
     elseif string.find(data_str, '{"session":"') then
         -- response to "proxy data" request from passive proxy
         proxy = true
