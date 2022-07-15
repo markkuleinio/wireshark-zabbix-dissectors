@@ -219,6 +219,7 @@ local function doDissect(buffer, pktinfo, tree)
         version = string.match(data_str, '"version":"(.-)"')
         tree_text = "Zabbix Proxy data from \"" .. hostname .. "\", " .. LEN
         info_text = "Zabbix Proxy data from \"" .. hostname .. "\", " .. LEN_AND_PORTS
+        session = string.match(data_str, '"session":"(.-)"')
     elseif string.find(data_str, '{"request":"proxy config",') then
         -- either from server to passive proxy, or from active proxy to server
         proxy = true
