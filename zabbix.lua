@@ -548,7 +548,7 @@ function zabbix_protocol.dissector(buffer, pktinfo, tree)
         pktinfo.desegment_len = data_length + ZBXD_HEADER_LEN - pktlength
         -- dissect anyway to show something if the TCP setting "Allow subdissector to
         -- reassemble TCP streams" is disabled
-        if flags == 3 then
+        if band(flags, FLAG_COMPRESSED) then
             doDissectCompressed(buffer, pktinfo, tree)
         else
             doDissect(buffer, pktinfo, tree)
@@ -559,12 +559,9 @@ function zabbix_protocol.dissector(buffer, pktinfo, tree)
     end
 
     -- now we have the data to dissect, let's do it
-    if flags == 3 then
-        -- 0x01 (ZBX_TCP_PROTOCOL) + 0x02 (ZBX_TCP_COMPRESS) -> this is compressed data
-        -- (see include/comms.h in Zabbix sources)
+    if band(flags, FLAG_COMPRESSED) then
         doDissectCompressed(buffer, pktinfo, tree)
     else
-        -- uncompressed data or unknown version, just try to dissect
         doDissect(buffer, pktinfo, tree)
     end
 end
