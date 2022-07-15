@@ -156,11 +156,18 @@ local function doDissect(buffer, pktinfo, tree)
         -- active agent sending data
         agent = true
         oper_type = T_AGENT_DATA + T_REQUEST
+        -- try matching host name in legacy agent style, inside "data" array
         hostname = string.match(data_str, '"data":%[{"host":"(.-)"')
         if hostname then
             agent_name = hostname
         else
-            hostname = "<unknown>"
+            -- not matched, now try the agent 2 syntax ("host" is outside the "data" array)
+            hostname = string.match(data_str, '"data":%[.*%].*"host":"(.-)"')
+            if hostname then
+                agent_name = hostname
+            else
+                hostname = "<unknown>"
+            end
         end
         tree_text = "Zabbix Send agent data from \"" .. hostname .. "\", " .. LEN
         info_text = "Zabbix Send agent data from \"" .. hostname .. "\", " .. LEN_AND_PORTS
