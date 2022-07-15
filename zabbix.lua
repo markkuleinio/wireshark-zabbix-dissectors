@@ -259,6 +259,7 @@ local function doDissect(buffer, pktinfo, tree)
         version = string.match(data_str, '"version":"(.-)"')
         tree_text = "Zabbix Passive Proxy Response, " .. LEN
         info_text = "Zabbix Passive Proxy Response, " .. LEN_AND_PORTS
+        session = string.match(data_str, '"session":"(.-)"')
     elseif string.find(data_str, '{"globalmacro":') then
         -- response for active proxy config request
         proxy = true
