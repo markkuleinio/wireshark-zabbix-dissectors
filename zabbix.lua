@@ -131,7 +131,6 @@ local function doDissect(buffer, pktinfo, tree)
 
     -- set default values, then modify them as needed:
     local oper_type = 0 -- undefined
-    local hostname
     local agent = false
     local proxy = false
     local agent_name = nil
@@ -144,7 +143,7 @@ local function doDissect(buffer, pktinfo, tree)
         -- agent requesting for active checks
         agent = true
         oper_type = T_CHECKS + T_REQUEST
-        hostname = string.match(data_str, '"host":"(.-)"')
+        local hostname = string.match(data_str, '"host":"(.-)"')
         if hostname then
             agent_name = hostname
         else
@@ -157,7 +156,7 @@ local function doDissect(buffer, pktinfo, tree)
         agent = true
         oper_type = T_AGENT_DATA + T_REQUEST
         -- try matching host name in legacy agent style, inside "data" array
-        hostname = string.match(data_str, '"data":%[{"host":"(.-)"')
+        local hostname = string.match(data_str, '"data":%[{"host":"(.-)"')
         if hostname then
             agent_name = hostname
         else
@@ -175,7 +174,7 @@ local function doDissect(buffer, pktinfo, tree)
         -- active agent sending heartbeats
         agent = true
         oper_type = T_AGENT_HEARTBEAT + T_REQUEST
-        hostname = string.match(data_str, '"host":"(.-)"')
+        local hostname = string.match(data_str, '"host":"(.-)"')
         if hostname then
             agent_name = hostname
         else
@@ -205,7 +204,7 @@ local function doDissect(buffer, pktinfo, tree)
         -- either from server to passive proxy, or from active proxy to server
         proxy = true
         oper_type = T_PROXY_DATA + T_REQUEST
-        hostname = string.match(data_str, '"host":"(.-)"')
+        local hostname = string.match(data_str, '"host":"(.-)"')
         if hostname then
             proxy_name = hostname
         else
@@ -218,7 +217,7 @@ local function doDissect(buffer, pktinfo, tree)
         -- either from server to passive proxy, or from active proxy to server
         proxy = true
         oper_type = T_PROXY_CONFIG + T_REQUEST
-        hostname = string.match(data_str, '"host":"(.-)"')
+        local hostname = string.match(data_str, '"host":"(.-)"')
         if hostname then
             proxy_name = hostname
         else
@@ -231,7 +230,7 @@ local function doDissect(buffer, pktinfo, tree)
         -- from active proxy to server
         proxy = true
         oper_type = T_PROXY_HEARTBEAT + T_REQUEST
-        hostname = string.match(data_str, '"host":"(.-)"')
+        local hostname = string.match(data_str, '"host":"(.-)"')
         if hostname then
             proxy_name = hostname
         else
