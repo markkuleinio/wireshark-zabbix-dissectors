@@ -207,7 +207,7 @@ local function doDissect(buffer, pktinfo, tree)
         tree_text = "Zabbix Response for proxy config, " .. LEN
         info_text = "Zabbix Response for proxy config, " .. LEN_AND_PORTS
     elseif string.find(data_str, '{"request":"proxy data",') then
-        -- either from server to passive proxy, or from active proxy to server
+        -- from active proxy to server
         proxy = true
         oper_type = T_PROXY_DATA + T_REQUEST
         local hostname = string.match(data_str, '"host":"(.-)"')
@@ -220,6 +220,12 @@ local function doDissect(buffer, pktinfo, tree)
         tree_text = "Zabbix Proxy data from \"" .. hostname .. "\", " .. LEN
         info_text = "Zabbix Proxy data from \"" .. hostname .. "\", " .. LEN_AND_PORTS
         session = string.match(data_str, '"session":"(.-)"')
+    elseif string.find(data_str, '{"request":"proxy data"}') then
+        -- from server to passive proxy
+        proxy = true
+        oper_type = T_PROXY_DATA + T_REQUEST
+        tree_text = "Zabbix Request for passive proxy data, " .. LEN
+        info_text = "Zabbix Request for passive proxy data, " .. LEN_AND_PORTS
     elseif string.find(data_str, '{"request":"proxy config",') then
         -- either from server to passive proxy, or from active proxy to server
         proxy = true
