@@ -1,36 +1,36 @@
-local VERSION = "2022-07-15.2"
-zabbix_protocol = Proto("Zabbix", "Zabbix Protocol")
+local VERSION = "2022-07-16.1"
+local zabbix_protocol = Proto("Zabbix", "Zabbix Protocol")
 -- for some reason the protocol name is shown in UPPERCASE in Protocol column
 -- (and in Proto.name), so let's define a string to override that
 local PROTOCOL_NAME = "Zabbix"
 
-p_header = ProtoField.string("zabbix.header", "Header", base.ASCII)
-p_flags = ProtoField.uint8("zabbix.flags", "Flags", base.HEX)
-p_length = ProtoField.uint32("zabbix.len", "Length", base.DEC)
-p_reserved = ProtoField.uint32("zabbix.reserved", "Reserved", base.DEC)
-p_uncompressed_length = ProtoField.uint32("zabbix.uncompressedlen", "Uncompressed length", base.DEC)
-p_large_length = ProtoField.uint64("zabbix.large.len", "Large length", base.DEC)
-p_large_reserved = ProtoField.uint64("zabbix.large.reserved", "Large reserved", base.DEC)
-p_large_uncompressed_length = ProtoField.uint64("zabbix.large.uncompressedlen", "Large uncompressed length", base.DEC)
-p_data = ProtoField.string("zabbix.data", "Data", base.ASCII)
+local p_header = ProtoField.string("zabbix.header", "Header", base.ASCII)
+local p_flags = ProtoField.uint8("zabbix.flags", "Flags", base.HEX)
+local p_length = ProtoField.uint32("zabbix.len", "Length", base.DEC)
+local p_reserved = ProtoField.uint32("zabbix.reserved", "Reserved", base.DEC)
+local p_uncompressed_length = ProtoField.uint32("zabbix.uncompressedlen", "Uncompressed length", base.DEC)
+local p_large_length = ProtoField.uint64("zabbix.large.len", "Large length", base.DEC)
+local p_large_reserved = ProtoField.uint64("zabbix.large.reserved", "Large reserved", base.DEC)
+local p_large_uncompressed_length = ProtoField.uint64("zabbix.large.uncompressedlen", "Large uncompressed length", base.DEC)
+local p_data = ProtoField.string("zabbix.data", "Data", base.ASCII)
 -- zabbix.datalen is derived from data length or from uncompressed length
-p_data_len = ProtoField.uint32("zabbix.datalen", "Data length", base.DEC)
-p_success = ProtoField.bool("zabbix.success", "Success")
-p_failed = ProtoField.bool("zabbix.failed", "Failed")
-p_response = ProtoField.bool("zabbix.response", "Response")
-p_version = ProtoField.string("zabbix.version", "Version", base.ASCII)
-p_session = ProtoField.string("zabbix.session", "Session", base.ASCII)
-p_agent = ProtoField.bool("zabbix.agent", "Active Agent Connection")
-p_agent_name = ProtoField.string("zabbix.agent.name", "Agent Name", base.ASCII)
-p_agent_checks = ProtoField.bool("zabbix.agent.activechecks", "Agent Active Checks")
-p_agent_data = ProtoField.bool("zabbix.agent.data", "Agent Data")
-p_proxy = ProtoField.bool("zabbix.proxy", "Proxy Connection")
-p_proxy_name = ProtoField.string("zabbix.proxy.name", "Proxy Name", base.ASCII)
-p_proxy_heartbeat = ProtoField.bool("zabbix.proxy.heartbeat", "Proxy Heartbeat")
-p_proxy_data = ProtoField.bool("zabbix.proxy.data", "Proxy Data")
-p_proxy_config = ProtoField.bool("zabbix.proxy.config", "Proxy Config")
-p_proxy_response = ProtoField.bool("zabbix.proxy.response", "Proxy Response")
-p_time = ProtoField.float("zabbix.time", "Time since the request was sent")
+local p_data_len = ProtoField.uint32("zabbix.datalen", "Data length", base.DEC)
+local p_success = ProtoField.bool("zabbix.success", "Success")
+local p_failed = ProtoField.bool("zabbix.failed", "Failed")
+local p_response = ProtoField.bool("zabbix.response", "Response")
+local p_version = ProtoField.string("zabbix.version", "Version", base.ASCII)
+local p_session = ProtoField.string("zabbix.session", "Session", base.ASCII)
+local p_agent = ProtoField.bool("zabbix.agent", "Active Agent Connection")
+local p_agent_name = ProtoField.string("zabbix.agent.name", "Agent Name", base.ASCII)
+local p_agent_checks = ProtoField.bool("zabbix.agent.activechecks", "Agent Active Checks")
+local p_agent_data = ProtoField.bool("zabbix.agent.data", "Agent Data")
+local p_proxy = ProtoField.bool("zabbix.proxy", "Proxy Connection")
+local p_proxy_name = ProtoField.string("zabbix.proxy.name", "Proxy Name", base.ASCII)
+local p_proxy_heartbeat = ProtoField.bool("zabbix.proxy.heartbeat", "Proxy Heartbeat")
+local p_proxy_data = ProtoField.bool("zabbix.proxy.data", "Proxy Data")
+local p_proxy_config = ProtoField.bool("zabbix.proxy.config", "Proxy Config")
+local p_proxy_response = ProtoField.bool("zabbix.proxy.response", "Proxy Response")
+local p_time = ProtoField.float("zabbix.time", "Time since the request was sent")
 
 zabbix_protocol.fields = { p_header, p_flags, p_length, p_reserved, p_uncompressed_length,
     p_large_length, p_large_reserved, p_large_uncompressed_length,
@@ -40,10 +40,10 @@ zabbix_protocol.fields = { p_header, p_flags, p_length, p_reserved, p_uncompress
     p_proxy_response, p_time,
 }
 
-e_unknown_use = ProtoExpert.new("zabbix.expert.unknown",
+local e_unknown_use = ProtoExpert.new("zabbix.expert.unknown",
     "Could not identify as agent or proxy connection, maybe request was not captured?",
     expert.group.RESPONSE_CODE, expert.severity.NOTE)
-e_failed_response = ProtoExpert.new("zabbix.expert.failed",
+local e_failed_response = ProtoExpert.new("zabbix.expert.failed",
     "Returned response: \"failed\"",
     expert.group.RESPONSE_CODE, expert.severity.NOTE)
 

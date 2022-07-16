@@ -1,16 +1,16 @@
-local VERSION = "2022-07-15.1"
-zabbixagent_protocol = Proto("ZabbixAgent", "Zabbix Agent Protocol")
+local VERSION = "2022-07-16.1"
+local zabbixagent_protocol = Proto("ZabbixAgent", "Zabbix Agent Protocol")
 -- for some reason the protocol name is shown in UPPERCASE in Protocol column
 -- (and in Proto.name), so let's define a string to override that
 local PROTOCOL_NAME = "ZabbixAgent"
 
-p_header = ProtoField.string("zabbixagent.header", "Header", base.ASCII)
-p_flags = ProtoField.uint8("zabbixagent.flags", "Flags", base.HEX)
-p_data_length = ProtoField.uint32("zabbixagent.len", "Length", base.DEC)
-p_reserved = ProtoField.uint32("zabbixagent.reserved", "Reserved", base.DEC)
-p_request = ProtoField.string("zabbixagent.request", "Requested item", base.ASCII)
-p_response = ProtoField.string("zabbixagent.response", "Response", base.ASCII)
-p_time = ProtoField.float("zabbixagent.time", "Time since the request was sent")
+local p_header = ProtoField.string("zabbixagent.header", "Header", base.ASCII)
+local p_flags = ProtoField.uint8("zabbixagent.flags", "Flags", base.HEX)
+local p_data_length = ProtoField.uint32("zabbixagent.len", "Length", base.DEC)
+local p_reserved = ProtoField.uint32("zabbixagent.reserved", "Reserved", base.DEC)
+local p_request = ProtoField.string("zabbixagent.request", "Requested item", base.ASCII)
+local p_response = ProtoField.string("zabbixagent.response", "Response", base.ASCII)
+local p_time = ProtoField.float("zabbixagent.time", "Time since the request was sent")
 
 zabbixagent_protocol.fields = {
     p_header, p_flags, p_data_length, p_reserved, p_request, p_response, p_time,
@@ -28,7 +28,7 @@ local default_settings =
 local timestamps = {}
 
 
-function doDissect_pre40(buffer, pktinfo, tree)
+local function doDissect_pre40(buffer, pktinfo, tree)
     -- dissect a pre-4.0 passive request, no header
     local pktlength = buffer:len()
     pktinfo.cols.protocol = PROTOCOL_NAME
@@ -51,7 +51,7 @@ function doDissect_pre40(buffer, pktinfo, tree)
 end
 
 
-function doDissect(buffer, pktinfo, tree)
+local function doDissect(buffer, pktinfo, tree)
     -- dissect the packet, with ZBXD header
     pktinfo.cols.protocol = PROTOCOL_NAME
     -- get the data length and reserved fields (32-bit little-endian unsigned integers)
