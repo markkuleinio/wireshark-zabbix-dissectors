@@ -153,6 +153,7 @@ local function doDissect(buffer, pktinfo, tree)
         end
         tree_text = "Zabbix Request for active checks for \"" .. hostname .. "\", " .. LEN
         info_text = "Zabbix Request for active checks for \"" .. hostname .. "\", " .. LEN_AND_PORTS
+        version = string.match(data_str, '"version":"(.-)"')
     elseif string.find(data_str, '{"request":"agent data",') then
         -- active agent sending data
         agent = true
