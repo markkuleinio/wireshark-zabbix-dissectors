@@ -172,6 +172,7 @@ local function doDissect(buffer, pktinfo, tree)
         end
         tree_text = "Zabbix Send agent data from \"" .. hostname .. "\", " .. LEN
         info_text = "Zabbix Send agent data from \"" .. hostname .. "\", " .. LEN_AND_PORTS
+        version = string.match(data_str, '"data":%[.*%].*"version":"(.-)"')
         session = string.match(data_str, '{"request":"agent data","session":"(.-)"')
         if not session then
             session = string.match(data_str, '"data":%[.*%].*"session":"(.-)"')
