@@ -29,6 +29,7 @@ local p_agent = ProtoField.bool("zabbix.agent", "Active Agent Connection")
 local p_agent_name = ProtoField.string("zabbix.agent.name", "Agent Name", base.ASCII)
 local p_agent_checks = ProtoField.bool("zabbix.agent.activechecks", "Agent Active Checks")
 local p_agent_data = ProtoField.bool("zabbix.agent.data", "Agent Data")
+local p_agent_heartbeatfreq = ProtoField.uint16("zabbix.agent.heartbeatfreq", "Agent Heartbeat Frequency")
 local p_proxy = ProtoField.bool("zabbix.proxy", "Proxy Connection")
 local p_proxy_name = ProtoField.string("zabbix.proxy.name", "Proxy Name", base.ASCII)
 local p_proxy_heartbeat = ProtoField.bool("zabbix.proxy.heartbeat", "Proxy Heartbeat")
@@ -42,7 +43,7 @@ zabbix_protocol.fields = {
     p_length, p_reserved, p_uncompressed_length,
     p_large_length, p_large_reserved, p_large_uncompressed_length,
     p_data, p_data_len, p_success, p_failed, p_response,
-    p_version, p_session, p_agent, p_agent_name, p_agent_checks, p_agent_data,
+    p_version, p_session, p_agent, p_agent_name, p_agent_checks, p_agent_data, p_agent_heartbeatfreq,
     p_proxy, p_proxy_name, p_proxy_heartbeat, p_proxy_data, p_proxy_config,
     p_proxy_response, p_time,
 }
@@ -145,6 +146,7 @@ local function doDissect(buffer, pktinfo, tree)
     local proxy_name = nil
     local version = nil
     local session = nil
+    local agent_heartbeat_freq = nil
     local tree_text = "Zabbix Protocol, Flags: " .. flags .. ", " .. LEN
     local info_text = "Zabbix Protocol, Flags=" .. flags .. ", " .. LEN_AND_PORTS
 
@@ -197,6 +199,7 @@ local function doDissect(buffer, pktinfo, tree)
         end
         tree_text = "Zabbix Agent heartbeat from \"" .. hostname .. "\", " .. LEN
         info_text = "Zabbix Agent heartbeat from \"" .. hostname .. "\", " .. LEN_AND_PORTS
+        agent_heartbeat_freq = string.match(data_str, '"heartbeat_freq":([0-9]*)')
     elseif string.find(data_str, '{"response":"success","data":') then
         -- response for agent's request for active checks
         agent = true
@@ -387,6 +390,9 @@ local function doDissect(buffer, pktinfo, tree)
     end
     if version then
         subtree:add(p_version, version)
+    end
+    if agent_heartbeat_freq then
+        subtree:add(p_agent_heartbeatfreq, agent_heartbeat_freq)
     end
     if band(oper_type, T_CHECKS) then
         if band(oper_type, T_REQUEST) then subtree:add(p_agent_checks,1)
