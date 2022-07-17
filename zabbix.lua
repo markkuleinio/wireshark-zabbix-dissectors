@@ -1,4 +1,4 @@
-local VERSION = "2022-07-16.1"
+local VERSION = "2022-07-17.1"
 local zabbix_protocol = Proto("Zabbix", "Zabbix Protocol")
 -- for some reason the protocol name is shown in UPPERCASE in Protocol column
 -- (and in Proto.name), so let's define a string to override that
@@ -6,6 +6,11 @@ local PROTOCOL_NAME = "Zabbix"
 
 local p_header = ProtoField.string("zabbix.header", "Header", base.ASCII)
 local p_flags = ProtoField.uint8("zabbix.flags", "Flags", base.HEX)
+local yes_no_map = {[1] = "Yes", [2] = "No"}
+local p_flag_zabbix = ProtoField.bool("zabbix.flags.zabbix", "Zabbix communications protocol", 8, yes_no_map, 0x01)
+local p_flag_compressed = ProtoField.bool("zabbix.flags.compressed", "Compressed", 8, yes_no_map, 0x02)
+local p_flag_largepacket = ProtoField.bool("zabbix.flags.largepacket", "Large packet", 8, yes_no_map, 0x04)
+local p_flag_reservedbits = ProtoField.uint8("zabbix.flags.reserved", "Reserved bits", base.DEC, {[0] = "All zeros"}, 0xF8, "Reserved, should be zeros")
 local p_length = ProtoField.uint32("zabbix.len", "Length", base.DEC)
 local p_reserved = ProtoField.uint32("zabbix.reserved", "Reserved", base.DEC)
 local p_uncompressed_length = ProtoField.uint32("zabbix.uncompressedlen", "Uncompressed length", base.DEC)
@@ -32,7 +37,9 @@ local p_proxy_config = ProtoField.bool("zabbix.proxy.config", "Proxy Config")
 local p_proxy_response = ProtoField.bool("zabbix.proxy.response", "Proxy Response")
 local p_time = ProtoField.float("zabbix.time", "Time since the request was sent")
 
-zabbix_protocol.fields = { p_header, p_flags, p_length, p_reserved, p_uncompressed_length,
+zabbix_protocol.fields = {
+    p_header, p_flags, p_flag_zabbix, p_flag_compressed, p_flag_largepacket, p_flag_reservedbits,
+    p_length, p_reserved, p_uncompressed_length,
     p_large_length, p_large_reserved, p_large_uncompressed_length,
     p_data, p_data_len, p_success, p_failed, p_response,
     p_version, p_session, p_agent, p_agent_name, p_agent_checks, p_agent_data,
@@ -318,11 +325,16 @@ local function doDissect(buffer, pktinfo, tree)
             flags_str = "[Compressed]"
         end
     end
+    local flagstree
     if flags_str then
-        subtree:add_le(p_flags, buffer(4,1), flags, nil, flags_str)
+        flagstree = subtree:add_le(p_flags, buffer(4,1), flags, nil, flags_str)
     else
-        subtree:add_le(p_flags, buffer(4,1))
+        flagstree = subtree:add_le(p_flags, buffer(4,1))
     end
+    flagstree:add_le(p_flag_reservedbits, buffer(4,1))
+    flagstree:add_le(p_flag_largepacket, buffer(4,1))
+    flagstree:add_le(p_flag_compressed, buffer(4,1))
+    flagstree:add_le(p_flag_zabbix, buffer(4,1))
     if IS_LARGE_PACKET then
         subtree:add_le(p_large_length, buffer(5,8))
         if IS_COMPRESSED then
