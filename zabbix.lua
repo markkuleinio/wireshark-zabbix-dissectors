@@ -1,4 +1,4 @@
-local VERSION = "2022-07-17.1"
+local VERSION = "2022-07-26.1"
 local zabbix_protocol = Proto("Zabbix", "Zabbix Protocol")
 -- for some reason the protocol name is shown in UPPERCASE in Protocol column
 -- (and in Proto.name), so let's define a string to override that
@@ -27,6 +27,8 @@ local p_version = ProtoField.string("zabbix.version", "Version", base.ASCII)
 local p_session = ProtoField.string("zabbix.session", "Session", base.ASCII)
 local p_agent = ProtoField.bool("zabbix.agent", "Active Agent Connection")
 local p_agent_name = ProtoField.string("zabbix.agent.name", "Agent Name", base.ASCII)
+local p_agent_hostmetadata = ProtoField.string("zabbix.agent.hostmetadata", "Agent Host Metadata", base.ASCII)
+local p_agent_port = ProtoField.uint16("zabbix.agent.port", "Agent Port")
 local p_agent_checks = ProtoField.bool("zabbix.agent.activechecks", "Agent Active Checks")
 local p_agent_data = ProtoField.bool("zabbix.agent.data", "Agent Data")
 local p_agent_heartbeatfreq = ProtoField.uint16("zabbix.agent.heartbeatfreq", "Agent Heartbeat Frequency")
@@ -44,6 +46,7 @@ zabbix_protocol.fields = {
     p_large_length, p_large_reserved, p_large_uncompressed_length,
     p_data, p_data_len, p_success, p_failed, p_response,
     p_version, p_session, p_agent, p_agent_name, p_agent_checks, p_agent_data, p_agent_heartbeatfreq,
+    p_agent_hostmetadata, p_agent_port,
     p_proxy, p_proxy_name, p_proxy_heartbeat, p_proxy_data, p_proxy_config,
     p_proxy_response, p_time,
 }
@@ -143,6 +146,8 @@ local function doDissect(buffer, pktinfo, tree)
     local agent = false
     local proxy = false
     local agent_name = nil
+    local agent_hostmetadata = nil
+    local agent_port = nil
     local proxy_name = nil
     local version = nil
     local session = nil
@@ -163,6 +168,8 @@ local function doDissect(buffer, pktinfo, tree)
         tree_text = "Zabbix Request for active checks for \"" .. hostname .. "\", " .. LEN
         info_text = "Zabbix Request for active checks for \"" .. hostname .. "\", " .. LEN_AND_PORTS
         version = string.match(data_str, '"version":"(.-)"')
+        agent_hostmetadata = string.match(data_str, '"host_metadata":"(.-)"')
+        agent_port = string.match(data_str, '"port":([0-9]*)')
     elseif string.find(data_str, '{"request":"agent data",') then
         -- active agent sending data
         agent = true
@@ -390,6 +397,12 @@ local function doDissect(buffer, pktinfo, tree)
     end
     if version then
         subtree:add(p_version, version)
+    end
+    if agent_hostmetadata then
+        subtree:add(p_agent_hostmetadata, agent_hostmetadata)
+    end
+    if agent_port then
+        subtree:add(p_agent_port, agent_port)
     end
     if agent_heartbeat_freq then
         subtree:add(p_agent_heartbeatfreq, agent_heartbeat_freq)
