@@ -28,6 +28,8 @@ local p_session = ProtoField.string("zabbix.session", "Session", base.ASCII)
 local p_agent = ProtoField.bool("zabbix.agent", "Active Agent Connection")
 local p_agent_name = ProtoField.string("zabbix.agent.name", "Agent Name", base.ASCII)
 local p_agent_hostmetadata = ProtoField.string("zabbix.agent.hostmetadata", "Agent Host Metadata", base.ASCII)
+local p_agent_hostinterface = ProtoField.string("zabbix.agent.hostinterface", "Agent Host Interface", base.ASCII)
+local p_agent_listenip = ProtoField.string("zabbix.agent.listenip", "Agent Listen IP", base.ASCII)
 local p_agent_port = ProtoField.uint16("zabbix.agent.port", "Agent Port")
 local p_agent_checks = ProtoField.bool("zabbix.agent.activechecks", "Agent Active Checks")
 local p_agent_data = ProtoField.bool("zabbix.agent.data", "Agent Data")
@@ -46,7 +48,7 @@ zabbix_protocol.fields = {
     p_large_length, p_large_reserved, p_large_uncompressed_length,
     p_data, p_data_len, p_success, p_failed, p_response,
     p_version, p_session, p_agent, p_agent_name, p_agent_checks, p_agent_data, p_agent_heartbeatfreq,
-    p_agent_hostmetadata, p_agent_port,
+    p_agent_hostmetadata, p_agent_hostinterface, p_agent_listenip, p_agent_port,
     p_proxy, p_proxy_name, p_proxy_heartbeat, p_proxy_data, p_proxy_config,
     p_proxy_response, p_time,
 }
@@ -147,6 +149,8 @@ local function doDissect(buffer, pktinfo, tree)
     local proxy = false
     local agent_name = nil
     local agent_hostmetadata = nil
+    local agent_hostinterface = nil
+    local agent_listenip = nil
     local agent_port = nil
     local proxy_name = nil
     local version = nil
@@ -169,6 +173,8 @@ local function doDissect(buffer, pktinfo, tree)
         info_text = "Zabbix Request for active checks for \"" .. hostname .. "\", " .. LEN_AND_PORTS
         version = string.match(data_str, '"version":"(.-)"')
         agent_hostmetadata = string.match(data_str, '"host_metadata":"(.-)"')
+        agent_hostinterface = string.match(data_str, '"interface":"(.-)"')
+        agent_listenip = string.match(data_str, '"ip":"(.-)"')
         agent_port = string.match(data_str, '"port":([0-9]*)')
     elseif string.find(data_str, '{"request":"agent data",') then
         -- active agent sending data
@@ -400,6 +406,12 @@ local function doDissect(buffer, pktinfo, tree)
     end
     if agent_hostmetadata then
         subtree:add(p_agent_hostmetadata, agent_hostmetadata)
+    end
+    if agent_hostinterface then
+        subtree:add(p_agent_hostinterface, agent_hostinterface)
+    end
+    if agent_listenip then
+        subtree:add(p_agent_listenip, agent_listenip)
     end
     if agent_port then
         subtree:add(p_agent_port, agent_port)
