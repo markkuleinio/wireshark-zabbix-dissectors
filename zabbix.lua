@@ -1,4 +1,4 @@
-local VERSION = "2022-07-26.2"
+local VERSION = "2022-07-27.1"
 local zabbix_protocol = Proto("Zabbix", "Zabbix Protocol")
 -- for some reason the protocol name is shown in UPPERCASE in Protocol column
 -- (and in Proto.name), so let's define a string to override that
@@ -29,7 +29,8 @@ local p_agent = ProtoField.bool("zabbix.agent", "Active Agent Connection")
 local p_agent_name = ProtoField.string("zabbix.agent.name", "Agent Name", base.ASCII)
 local p_agent_hostmetadata = ProtoField.string("zabbix.agent.hostmetadata", "Agent Host Metadata", base.ASCII)
 local p_agent_hostinterface = ProtoField.string("zabbix.agent.hostinterface", "Agent Host Interface", base.ASCII)
-local p_agent_listenip = ProtoField.string("zabbix.agent.listenip", "Agent Listen IP", base.ASCII)
+local p_agent_listenipv4 = ProtoField.ipv4("zabbix.agent.listenipv4", "Agent Listen IPv4")
+local p_agent_listenipv6 = ProtoField.ipv6("zabbix.agent.listenipv6", "Agent Listen IPv6")
 local p_agent_listenport = ProtoField.uint16("zabbix.agent.listenport", "Agent Listen Port")
 local p_agent_checks = ProtoField.bool("zabbix.agent.activechecks", "Agent Active Checks")
 local p_agent_data = ProtoField.bool("zabbix.agent.data", "Agent Data")
@@ -48,7 +49,7 @@ zabbix_protocol.fields = {
     p_large_length, p_large_reserved, p_large_uncompressed_length,
     p_data, p_data_len, p_success, p_failed, p_response,
     p_version, p_session, p_agent, p_agent_name, p_agent_checks, p_agent_data, p_agent_heartbeatfreq,
-    p_agent_hostmetadata, p_agent_hostinterface, p_agent_listenip, p_agent_listenport,
+    p_agent_hostmetadata, p_agent_hostinterface, p_agent_listenipv4, p_agent_listenipv6, p_agent_listenport,
     p_proxy, p_proxy_name, p_proxy_heartbeat, p_proxy_data, p_proxy_config,
     p_proxy_response, p_time,
 }
@@ -411,7 +412,11 @@ local function doDissect(buffer, pktinfo, tree)
         subtree:add(p_agent_hostinterface, agent_hostinterface)
     end
     if agent_listenip then
-        subtree:add(p_agent_listenip, agent_listenip)
+        if string.find(agent_listenip, ":") then
+            subtree:add(p_agent_listenipv6, Address.ipv6(agent_listenip))
+        else
+            subtree:add(p_agent_listenipv4, Address.ipv4(agent_listenip))
+        end
     end
     if agent_listenport then
         subtree:add(p_agent_listenport, agent_listenport)
