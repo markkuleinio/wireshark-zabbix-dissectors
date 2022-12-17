@@ -12,7 +12,7 @@ or on the firewall between the components)
 1. Use display filters to your advantage (see below)
 
 Tested with various versions, like:
-- Zabbix 4.0.0, 4.0.9, 4.0.14, 4.4.4, 6.2.0
+- Zabbix 4.0.0, 4.0.9, 4.0.14, 4.4.4, 6.2.0, 6.4.0beta4
 - Wireshark (on 64-bit Windows) 2.6.x, 3.0.2, 3.2.1, 3.6.6, 4.0.2
 - (not in all combinations but to give you an idea)
 

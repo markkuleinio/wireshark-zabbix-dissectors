@@ -45,6 +45,9 @@ local p_proxy_name = ProtoField.string("zabbix.proxy.name", "Proxy Name", base.A
 local p_proxy_heartbeat = ProtoField.bool("zabbix.proxy.heartbeat", "Proxy Heartbeat")
 local p_proxy_data = ProtoField.bool("zabbix.proxy.data", "Proxy Data")
 local p_proxy_config = ProtoField.bool("zabbix.proxy.config", "Proxy Config")
+local p_proxy_fullsync = ProtoField.bool("zabbix.proxy.fullsync", "Proxy Full Sync")
+local p_proxy_incremental_config = ProtoField.bool("zabbix.proxy.incrementalconfig", "Proxy Incremental Config")
+local p_proxy_no_config_change = ProtoField.bool("zabbix.proxy.noconfigchange", "Proxy No Config Change")
 local p_proxy_response = ProtoField.bool("zabbix.proxy.response", "Proxy Response")
 local p_time = ProtoField.float("zabbix.time", "Time since the request was sent")
 
@@ -55,8 +58,8 @@ zabbix_protocol.fields = {
     p_data, p_data_len, p_success, p_failed, p_response,
     p_version, p_session, p_agent, p_agent_name, p_agent_checks, p_agent_data, p_agent_heartbeatfreq,
     p_agent_hostmetadata, p_agent_hostinterface, p_agent_listenipv4, p_agent_listenipv6, p_agent_listenport,
-    p_proxy, p_proxy_name, p_proxy_heartbeat, p_proxy_data, p_proxy_config,
-    p_proxy_response, p_time,
+    p_proxy, p_proxy_name, p_proxy_heartbeat, p_proxy_data, p_proxy_config, p_proxy_fullsync,
+    p_proxy_incremental_config, p_proxy_no_config_change, p_proxy_response, p_time,
 }
 
 local e_unknown_use = ProtoExpert.new("zabbix.expert.unknown",
@@ -79,8 +82,11 @@ local T_AGENT_DATA = 0x0020
 local T_AGENT_HEARTBEAT = 0x0040
 local T_PROXY_HEARTBEAT = 0x0080
 local T_PROXY_CONFIG = 0x0100
-local T_PROXY_DATA = 0x0200
-local T_PASSIVE_PROXY_RESPONSE = 0x0400
+local T_PROXY_FULLSYNC = 0x0200
+local T_PROXY_INCREMENTAL_CONFIG = 0x0400
+local T_PROXY_NO_CONFIG_CHANGE = 0x0800
+local T_PROXY_DATA = 0x1000
+local T_PASSIVE_PROXY_RESPONSE = 0x2000
 
 -- flags in Zabbix protocol header
 local FLAG_ZABBIX_COMMUNICATIONS = 0x01
@@ -281,9 +287,29 @@ local function doDissect(buffer, pktinfo, tree)
         tree_text = "Zabbix Proxy heartbeat for \"" .. hostname .. "\", " .. LEN
         info_text = "Zabbix Proxy heartbeat for \"" .. hostname .. "\", " .. LEN_AND_PORTS
     elseif string.find(data_str, '{"globalmacro":') then
-        -- response for active proxy config request
+        -- response for active proxy config request before Zabbix 6.4
         proxy = true
         oper_type = T_PROXY_CONFIG + T_RESPONSE
+        tree_text = "Zabbix Response for proxy config, " .. LEN
+        info_text = "Zabbix Response for proxy config, " .. LEN_AND_PORTS
+    elseif string.find(data_str, '{"full_sync":1,') then
+        -- response for active proxy config request in Zabbix 6.4+
+        proxy = true
+        oper_type = T_PROXY_CONFIG + T_PROXY_FULLSYNC + T_RESPONSE
+        tree_text = "Zabbix Response for proxy config, " .. LEN
+        info_text = "Zabbix Response for proxy config, " .. LEN_AND_PORTS
+    elseif string.find(data_str, '{"data":{},') then
+        -- response for active proxy config request in Zabbix 6.4+ when not full sync
+        -- and no config change
+        proxy = true
+        oper_type = T_PROXY_CONFIG + T_PROXY_NO_CONFIG_CHANGE + T_RESPONSE
+        tree_text = "Zabbix Response for proxy config, " .. LEN
+        info_text = "Zabbix Response for proxy config, " .. LEN_AND_PORTS
+    elseif string.find(data_str, '{"data":{') then
+        -- response for active proxy config request in Zabbix 6.4+ when not full sync
+        -- and incremental config change is present
+        proxy = true
+        oper_type = T_PROXY_CONFIG + T_PROXY_INCREMENTAL_CONFIG + T_RESPONSE
         tree_text = "Zabbix Response for proxy config, " .. LEN
         info_text = "Zabbix Response for proxy config, " .. LEN_AND_PORTS
     elseif string.find(data_str, '{"session":"') then
@@ -441,6 +467,9 @@ local function doDissect(buffer, pktinfo, tree)
     end
     if band(oper_type, T_PROXY_DATA) then subtree:add(p_proxy_data,1) end
     if band(oper_type, T_PROXY_CONFIG) then subtree:add(p_proxy_config,1) end
+    if band(oper_type, T_PROXY_FULLSYNC) then subtree:add(p_proxy_fullsync,1) end
+    if band(oper_type, T_PROXY_INCREMENTAL_CONFIG) then subtree:add(p_proxy_incremental_config,1) end
+    if band(oper_type, T_PROXY_NO_CONFIG_CHANGE) then subtree:add(p_proxy_no_config_change,1) end
     if band(oper_type, T_PROXY_HEARTBEAT) then subtree:add(p_proxy_heartbeat,1) end
     if band(oper_type, T_PASSIVE_PROXY_RESPONSE) then subtree:add(p_proxy_response,1):set_generated() end
     if band(oper_type, T_RESPONSE) then subtree:add(p_response,1) end
