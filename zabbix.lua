@@ -260,7 +260,7 @@ local function doDissect(buffer, pktinfo, tree)
         oper_type = T_PROXY_DATA + T_REQUEST
         tree_text = "Zabbix Request for passive proxy data, " .. LEN
         info_text = "Zabbix Request for passive proxy data, " .. LEN_AND_PORTS
-    elseif string.find(data_str, '{"request":"proxy config",') then
+    elseif string.find(data_str, '{"request":"proxy config"') then
         -- either from server to passive proxy, or from active proxy to server
         proxy = true
         oper_type = T_PROXY_CONFIG + T_REQUEST
@@ -271,8 +271,12 @@ local function doDissect(buffer, pktinfo, tree)
             version = string.match(data_str, '"version":"(.-)"')
             tree_text = "Zabbix Request proxy config for \"" .. hostname .. "\", " .. LEN
             info_text = "Zabbix Request proxy config for \"" .. hostname .. "\", " .. LEN_AND_PORTS
+        elseif string.find(data_str, '{"request":"proxy config"}') then
+            -- this is server to passive proxy in Zabbix 6.4 starting to send config
+            tree_text = "Zabbix Start send proxy config to passive proxy, " .. LEN
+            info_text = "Zabbix Start send proxy config to passive proxy, " .. LEN_AND_PORTS
         else
-            -- this is server sending config to passive proxy
+            -- this is server sending config to passive proxy before Zabbix 6.4
             tree_text = "Zabbix Send proxy config to passive proxy, " .. LEN
             info_text = "Zabbix Send proxy config to passive proxy, " .. LEN_AND_PORTS
         end
@@ -296,27 +300,56 @@ local function doDissect(buffer, pktinfo, tree)
         tree_text = "Zabbix Response for proxy config, " .. LEN
         info_text = "Zabbix Response for proxy config, " .. LEN_AND_PORTS
     elseif string.find(data_str, '{"full_sync":1,') then
-        -- response for active proxy config request in Zabbix 6.4+
+        -- response for active proxy config request, or passive proxy
+        -- configuration (both in Zabbix 6.4+)
         proxy = true
-        oper_type = T_PROXY_CONFIG + T_PROXY_FULLSYNC + T_RESPONSE
-        tree_text = "Zabbix Response for proxy config, " .. LEN
-        info_text = "Zabbix Response for proxy config, " .. LEN_AND_PORTS
+        local calc_hash = tostring(pktinfo.src) .. ":" .. tostring(pktinfo.src_port) ..
+            "-" .. tostring(pktinfo.dst) .. ":" .. tostring(pktinfo.dst_port)
+        if timestamps[calc_hash] then
+            -- this session is already found, so this is a passive proxy config
+            oper_type = T_PROXY_CONFIG + T_PROXY_FULLSYNC
+            tree_text = "Zabbix Passive proxy config, " .. LEN
+            info_text = "Zabbix Passive proxy config, " .. LEN_AND_PORTS
+        else
+            oper_type = T_PROXY_CONFIG + T_PROXY_FULLSYNC + T_RESPONSE
+            tree_text = "Zabbix Response for proxy config, " .. LEN
+            info_text = "Zabbix Response for proxy config, " .. LEN_AND_PORTS
+        end
         proxy_config_revision = string.match(data_str, ',"config_revision":(%d+)')
     elseif string.find(data_str, '{"data":{},') then
-        -- response for active proxy config request in Zabbix 6.4+ when not full sync
-        -- and no config change
+        -- response for active proxy config request, or passive proxy
+        -- configuration when not full sync and no config change (both in Zabbix 6.4+)
         proxy = true
-        oper_type = T_PROXY_CONFIG + T_PROXY_NO_CONFIG_CHANGE + T_RESPONSE
-        tree_text = "Zabbix Response for proxy config, " .. LEN
-        info_text = "Zabbix Response for proxy config, " .. LEN_AND_PORTS
+        local calc_hash = tostring(pktinfo.src) .. ":" .. tostring(pktinfo.src_port) ..
+            "-" .. tostring(pktinfo.dst) .. ":" .. tostring(pktinfo.dst_port)
+        if timestamps[calc_hash] then
+            -- this session is already found, so this is a passive proxy config
+            oper_type = T_PROXY_CONFIG + T_PROXY_NO_CONFIG_CHANGE
+            tree_text = "Zabbix Passive proxy config, " .. LEN
+            info_text = "Zabbix Passive proxy config, " .. LEN_AND_PORTS
+        else
+            oper_type = T_PROXY_CONFIG + T_PROXY_NO_CONFIG_CHANGE + T_RESPONSE
+            tree_text = "Zabbix Response for proxy config, " .. LEN
+            info_text = "Zabbix Response for proxy config, " .. LEN_AND_PORTS
+        end
         proxy_config_revision = string.match(data_str, ',"config_revision":(%d+)')
     elseif string.find(data_str, '{"data":{') then
-        -- response for active proxy config request in Zabbix 6.4+ when not full sync
-        -- and incremental config change is present
+        -- response for active proxy config request, or passive proxy
+        -- configuration when not full sync and incremental config change is present
+        -- (both in Zabbix 6.4+)
         proxy = true
-        oper_type = T_PROXY_CONFIG + T_PROXY_INCREMENTAL_CONFIG + T_RESPONSE
-        tree_text = "Zabbix Response for proxy config, " .. LEN
-        info_text = "Zabbix Response for proxy config, " .. LEN_AND_PORTS
+        local calc_hash = tostring(pktinfo.src) .. ":" .. tostring(pktinfo.src_port) ..
+            "-" .. tostring(pktinfo.dst) .. ":" .. tostring(pktinfo.dst_port)
+        if timestamps[calc_hash] then
+            -- this session is already found, so this is a passive proxy config
+            oper_type = T_PROXY_CONFIG + T_PROXY_INCREMENTAL_CONFIG
+            tree_text = "Zabbix Passive proxy config, " .. LEN
+            info_text = "Zabbix Passive proxy config, " .. LEN_AND_PORTS
+        else
+            oper_type = T_PROXY_CONFIG + T_PROXY_INCREMENTAL_CONFIG + T_RESPONSE
+            tree_text = "Zabbix Response for proxy config, " .. LEN
+            info_text = "Zabbix Response for proxy config, " .. LEN_AND_PORTS
+        end
         proxy_config_revision = string.match(data_str, ',"config_revision":(%d+)')
     elseif string.find(data_str, '{"session":"') then
         -- response to "proxy data" request from passive proxy
@@ -332,6 +365,15 @@ local function doDissect(buffer, pktinfo, tree)
         oper_type = T_PROXY_CONFIG + T_RESPONSE
         tree_text = "Zabbix Response for proxy config, " .. LEN
         info_text = "Zabbix Response for proxy config, " .. LEN_AND_PORTS
+    elseif string.find(data_str, '{"version":') then
+        -- response from passive proxy for config request
+        proxy = true
+        oper_type = T_PROXY_CONFIG + T_RESPONSE
+        tree_text = "Zabbix Response for proxy config, " .. LEN
+        info_text = "Zabbix Response for proxy config, " .. LEN_AND_PORTS
+        version = string.match(data_str, '{"version":"(.-)"')
+        session = string.match(data_str, '"session":"(.-)"')
+        proxy_config_revision = string.match(data_str, ',"config_revision":(%d+)')
     elseif string.find(data_str, '"response":"success"') then
         -- response of some sort, successful
         proxy = true
