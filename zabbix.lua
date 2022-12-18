@@ -30,6 +30,7 @@ local p_failed = ProtoField.bool("zabbix.failed", "Failed")
 local p_response = ProtoField.bool("zabbix.response", "Response")
 local p_version = ProtoField.string("zabbix.version", "Version", base.ASCII)
 local p_session = ProtoField.string("zabbix.session", "Session", base.ASCII)
+local p_config_revision = ProtoField.uint64("zabbix.configrevision", "Config Revision", base.DEC)
 local p_agent = ProtoField.bool("zabbix.agent", "Active Agent Connection")
 local p_agent_name = ProtoField.string("zabbix.agent.name", "Agent Name", base.ASCII)
 local p_agent_hostmetadata = ProtoField.string("zabbix.agent.hostmetadata", "Agent Host Metadata", base.ASCII)
@@ -48,7 +49,6 @@ local p_proxy_config = ProtoField.bool("zabbix.proxy.config", "Proxy Config")
 local p_proxy_fullsync = ProtoField.bool("zabbix.proxy.fullsync", "Proxy Full Sync")
 local p_proxy_incremental_config = ProtoField.bool("zabbix.proxy.incrementalconfig", "Proxy Incremental Config")
 local p_proxy_no_config_change = ProtoField.bool("zabbix.proxy.noconfigchange", "Proxy No Config Change")
-local p_proxy_config_revision = ProtoField.uint64("zabbix.proxy.configrevision", "Proxy Config Revision", base.DEC)
 local p_proxy_response = ProtoField.bool("zabbix.proxy.response", "Proxy Response")
 local p_time = ProtoField.float("zabbix.time", "Time since the request was sent")
 
@@ -57,10 +57,11 @@ zabbix_protocol.fields = {
     p_length, p_reserved, p_uncompressed_length,
     p_large_length, p_large_reserved, p_large_uncompressed_length,
     p_data, p_data_len, p_success, p_failed, p_response,
-    p_version, p_session, p_agent, p_agent_name, p_agent_checks, p_agent_data, p_agent_heartbeatfreq,
+    p_version, p_session, p_config_revision,
+    p_agent, p_agent_name, p_agent_checks, p_agent_data, p_agent_heartbeatfreq,
     p_agent_hostmetadata, p_agent_hostinterface, p_agent_listenipv4, p_agent_listenipv6, p_agent_listenport,
     p_proxy, p_proxy_name, p_proxy_heartbeat, p_proxy_data, p_proxy_config, p_proxy_fullsync,
-    p_proxy_incremental_config, p_proxy_no_config_change, p_proxy_config_revision,
+    p_proxy_incremental_config, p_proxy_no_config_change,
     p_proxy_response, p_time,
 }
 
@@ -167,9 +168,9 @@ local function doDissect(buffer, pktinfo, tree)
     local agent_listenip = nil
     local agent_listenport = nil
     local proxy_name = nil
-    local proxy_config_revision = nil
     local version = nil
     local session = nil
+    local config_revision = nil
     local agent_heartbeat_freq = nil
     local tree_text = "Zabbix Protocol, Flags: " .. flags .. ", " .. LEN
     local info_text = "Zabbix Protocol, Flags=" .. flags .. ", " .. LEN_AND_PORTS
@@ -315,7 +316,7 @@ local function doDissect(buffer, pktinfo, tree)
             tree_text = "Zabbix Response for proxy config, " .. LEN
             info_text = "Zabbix Response for proxy config, " .. LEN_AND_PORTS
         end
-        proxy_config_revision = string.match(data_str, ',"config_revision":(%d+)')
+        config_revision = string.match(data_str, ',"config_revision":(%d+)')
     elseif string.find(data_str, '{"data":{},') then
         -- response for active proxy config request, or passive proxy
         -- configuration when not full sync and no config change (both in Zabbix 6.4+)
@@ -332,7 +333,7 @@ local function doDissect(buffer, pktinfo, tree)
             tree_text = "Zabbix Response for proxy config, " .. LEN
             info_text = "Zabbix Response for proxy config, " .. LEN_AND_PORTS
         end
-        proxy_config_revision = string.match(data_str, ',"config_revision":(%d+)')
+        config_revision = string.match(data_str, ',"config_revision":(%d+)')
     elseif string.find(data_str, '{"data":{') then
         -- response for active proxy config request, or passive proxy
         -- configuration when not full sync and incremental config change is present
@@ -350,7 +351,7 @@ local function doDissect(buffer, pktinfo, tree)
             tree_text = "Zabbix Response for proxy config, " .. LEN
             info_text = "Zabbix Response for proxy config, " .. LEN_AND_PORTS
         end
-        proxy_config_revision = string.match(data_str, ',"config_revision":(%d+)')
+        config_revision = string.match(data_str, ',"config_revision":(%d+)')
     elseif string.find(data_str, '{"session":"') then
         -- response to "proxy data" request from passive proxy
         proxy = true
@@ -373,7 +374,7 @@ local function doDissect(buffer, pktinfo, tree)
         info_text = "Zabbix Response for proxy config, " .. LEN_AND_PORTS
         version = string.match(data_str, '{"version":"(.-)"')
         session = string.match(data_str, '"session":"(.-)"')
-        proxy_config_revision = string.match(data_str, ',"config_revision":(%d+)')
+        config_revision = string.match(data_str, ',"config_revision":(%d+)')
     elseif string.find(data_str, '"response":"success"') then
         -- response of some sort, successful
         proxy = true
@@ -518,9 +519,9 @@ local function doDissect(buffer, pktinfo, tree)
     if band(oper_type, T_PROXY_FULLSYNC) then subtree:add(p_proxy_fullsync,1) end
     if band(oper_type, T_PROXY_INCREMENTAL_CONFIG) then subtree:add(p_proxy_incremental_config,1) end
     if band(oper_type, T_PROXY_NO_CONFIG_CHANGE) then subtree:add(p_proxy_no_config_change,1) end
-    if proxy_config_revision then subtree:add(p_proxy_config_revision, UInt64.new(proxy_config_revision)) end
     if band(oper_type, T_PROXY_HEARTBEAT) then subtree:add(p_proxy_heartbeat,1) end
     if band(oper_type, T_PASSIVE_PROXY_RESPONSE) then subtree:add(p_proxy_response,1):set_generated() end
+    if config_revision then subtree:add(p_config_revision, UInt64.new(config_revision)) end
     if band(oper_type, T_RESPONSE) then subtree:add(p_response,1) end
     if band(oper_type, T_SUCCESS) then subtree:add(p_success,1) end
     if band(oper_type, T_FAILED) then
