@@ -1,5 +1,5 @@
 local plugin_info = {
-    version = "2022-12-17.2",
+    version = "2022-12-18.1",
     author = "Markku Leiniö",
     repository = "https://github.com/markkuleinio/wireshark-zabbix-dissectors",
 }
@@ -192,6 +192,7 @@ local function doDissect(buffer, pktinfo, tree)
         agent_hostinterface = string.match(data_str, '"interface":"(.-)"')
         agent_listenip = string.match(data_str, '"ip":"(.-)"')
         agent_listenport = string.match(data_str, '"port":([0-9]*)')
+        config_revision = string.match(data_str, ',"config_revision":(%d+)')
     elseif string.find(data_str, '{"request":"agent data",') then
         -- active agent sending data
         agent = true
@@ -229,18 +230,19 @@ local function doDissect(buffer, pktinfo, tree)
         tree_text = "Zabbix Agent heartbeat from \"" .. hostname .. "\", " .. LEN
         info_text = "Zabbix Agent heartbeat from \"" .. hostname .. "\", " .. LEN_AND_PORTS
         agent_heartbeat_freq = string.match(data_str, '"heartbeat_freq":([0-9]*)')
-    elseif string.find(data_str, '{"response":"success","data":') then
+    elseif string.find(data_str, '{"response":"success","info":') then
+        -- response for active agent data send
+        agent = true
+        oper_type = T_SUCCESS + T_AGENT_DATA + T_RESPONSE
+        tree_text = "Zabbix Response for agent data (success), " .. LEN
+        info_text = "Zabbix Response for agent data (success), " .. LEN_AND_PORTS
+    elseif string.find(data_str, '{"response":"success",') then
         -- response for agent's request for active checks
         agent = true
         oper_type = T_SUCCESS + T_CHECKS + T_RESPONSE
         tree_text = "Zabbix Response for active checks (success), " .. LEN
         info_text = "Zabbix Response for active checks (success), " .. LEN_AND_PORTS
-    elseif string.find(data_str, '{"response":"success","info":') then
-        -- response for agent data send
-        agent = true
-        oper_type = T_SUCCESS + T_AGENT_DATA + T_RESPONSE
-        tree_text = "Zabbix Response for agent data (success), " .. LEN
-        info_text = "Zabbix Response for agent data (success), " .. LEN_AND_PORTS
+        config_revision = string.match(data_str, ',"config_revision":(%d+)')
     elseif string.find(data_str, '{"request":"proxy data",') then
         -- from active proxy to server
         proxy = true
