@@ -48,7 +48,7 @@ local p_proxy_config = ProtoField.bool("zabbix.proxy.config", "Proxy Config")
 local p_proxy_fullsync = ProtoField.bool("zabbix.proxy.fullsync", "Proxy Full Sync")
 local p_proxy_incremental_config = ProtoField.bool("zabbix.proxy.incrementalconfig", "Proxy Incremental Config")
 local p_proxy_no_config_change = ProtoField.bool("zabbix.proxy.noconfigchange", "Proxy No Config Change")
-local p_proxy_config_revision = ProtoField.uint32("zabbix.proxy.configrevision", "Proxy Config Revision", base.DEC)
+local p_proxy_config_revision = ProtoField.uint64("zabbix.proxy.configrevision", "Proxy Config Revision", base.DEC)
 local p_proxy_response = ProtoField.bool("zabbix.proxy.response", "Proxy Response")
 local p_time = ProtoField.float("zabbix.time", "Time since the request was sent")
 
@@ -518,7 +518,7 @@ local function doDissect(buffer, pktinfo, tree)
     if band(oper_type, T_PROXY_FULLSYNC) then subtree:add(p_proxy_fullsync,1) end
     if band(oper_type, T_PROXY_INCREMENTAL_CONFIG) then subtree:add(p_proxy_incremental_config,1) end
     if band(oper_type, T_PROXY_NO_CONFIG_CHANGE) then subtree:add(p_proxy_no_config_change,1) end
-    if proxy_config_revision then subtree:add(p_proxy_config_revision, tonumber(proxy_config_revision)) end
+    if proxy_config_revision then subtree:add(p_proxy_config_revision, UInt64.new(proxy_config_revision)) end
     if band(oper_type, T_PROXY_HEARTBEAT) then subtree:add(p_proxy_heartbeat,1) end
     if band(oper_type, T_PASSIVE_PROXY_RESPONSE) then subtree:add(p_proxy_response,1):set_generated() end
     if band(oper_type, T_RESPONSE) then subtree:add(p_response,1) end
