@@ -1,5 +1,5 @@
 local plugin_info = {
-    version = "2022-12-18.1",
+    version = "2023-01-01.1",
     author = "Markku Leiniö",
     repository = "https://github.com/markkuleinio/wireshark-zabbix-dissectors",
 }
@@ -50,6 +50,8 @@ local p_proxy_fullsync = ProtoField.bool("zabbix.proxy.fullsync", "Proxy Full Sy
 local p_proxy_incremental_config = ProtoField.bool("zabbix.proxy.incrementalconfig", "Proxy Incremental Config")
 local p_proxy_no_config_change = ProtoField.bool("zabbix.proxy.noconfigchange", "Proxy No Config Change")
 local p_proxy_response = ProtoField.bool("zabbix.proxy.response", "Proxy Response")
+local p_sender = ProtoField.bool("zabbix.sender", "Sender Connection")
+local p_sender_data = ProtoField.bool("zabbix.sender.data", "Sender Data")
 local p_time = ProtoField.float("zabbix.time", "Time since the request was sent")
 
 zabbix_protocol.fields = {
@@ -61,8 +63,8 @@ zabbix_protocol.fields = {
     p_agent, p_agent_name, p_agent_checks, p_agent_data, p_agent_heartbeatfreq,
     p_agent_hostmetadata, p_agent_hostinterface, p_agent_listenipv4, p_agent_listenipv6, p_agent_listenport,
     p_proxy, p_proxy_name, p_proxy_heartbeat, p_proxy_data, p_proxy_config, p_proxy_fullsync,
-    p_proxy_incremental_config, p_proxy_no_config_change,
-    p_proxy_response, p_time,
+    p_proxy_incremental_config, p_proxy_no_config_change, p_proxy_response,
+    p_sender, p_sender_data, p_time,
 }
 
 local e_unknown_use = ProtoExpert.new("zabbix.expert.unknown",
@@ -90,6 +92,7 @@ local T_PROXY_INCREMENTAL_CONFIG = 0x0400
 local T_PROXY_NO_CONFIG_CHANGE = 0x0800
 local T_PROXY_DATA = 0x1000
 local T_PASSIVE_PROXY_RESPONSE = 0x2000
+local T_SENDER_DATA = 0x4000
 
 -- flags in Zabbix protocol header
 local FLAG_ZABBIX_COMMUNICATIONS = 0x01
@@ -109,6 +112,7 @@ local default_settings =
 local timestamps = {}
 local agent_names = {}
 local proxy_names = {}
+local senders = {}
 
 local function band(a, b)
     if bit.band(a, b) > 0 then return true
@@ -162,6 +166,7 @@ local function doDissect(buffer, pktinfo, tree)
     local oper_type = 0 -- undefined
     local agent = false
     local proxy = false
+    local sender = false
     local agent_name = nil
     local agent_hostmetadata = nil
     local agent_hostinterface = nil
@@ -231,11 +236,20 @@ local function doDissect(buffer, pktinfo, tree)
         info_text = "Zabbix Agent heartbeat from \"" .. hostname .. "\", " .. LEN_AND_PORTS
         agent_heartbeat_freq = string.match(data_str, '"heartbeat_freq":([0-9]*)')
     elseif string.find(data_str, '{"response":"success","info":') then
-        -- response for active agent data send
-        agent = true
-        oper_type = T_SUCCESS + T_AGENT_DATA + T_RESPONSE
-        tree_text = "Zabbix Response for agent data (success), " .. LEN
-        info_text = "Zabbix Response for agent data (success), " .. LEN_AND_PORTS
+        -- response for active agent or sender (trapper) data send
+        local retrieve_hash = tostring(pktinfo.dst) .. ":" .. tostring(pktinfo.dst_port) ..
+        "-" .. tostring(pktinfo.src) .. ":" .. tostring(pktinfo.src_port)
+        if senders[retrieve_hash] then
+            sender = true
+            oper_type = T_SUCCESS + T_SENDER_DATA + T_RESPONSE
+            tree_text = "Zabbix Response for sender data (success), " .. LEN
+            info_text = "Zabbix Response for sender data (success), " .. LEN_AND_PORTS
+        else
+            agent = true
+            oper_type = T_SUCCESS + T_AGENT_DATA + T_RESPONSE
+            tree_text = "Zabbix Response for agent data (success), " .. LEN
+            info_text = "Zabbix Response for agent data (success), " .. LEN_AND_PORTS
+        end
     elseif string.find(data_str, '{"response":"success",') then
         -- response for agent's request for active checks
         agent = true
@@ -377,6 +391,12 @@ local function doDissect(buffer, pktinfo, tree)
         version = string.match(data_str, '{"version":"(.-)"')
         session = string.match(data_str, '"session":"(.-)"')
         config_revision = string.match(data_str, ',"config_revision":(%d+)')
+    elseif string.find(data_str, '{"request":"sender data","data":') then
+        -- sender/trapper
+        sender = true
+        oper_type = T_SENDER_DATA + T_REQUEST
+        tree_text = "Zabbix Sender data, " .. LEN
+        info_text = "Zabbix Sender data, " .. LEN_AND_PORTS
     elseif string.find(data_str, '"response":"success"') then
         -- response of some sort, successful
         proxy = true
@@ -412,6 +432,9 @@ local function doDissect(buffer, pktinfo, tree)
         if proxy_name then
             -- proxy name was detected, save it as well
             proxy_names[save_hash] = proxy_name
+        end
+        if sender then
+            senders[save_hash] = true
         end
     end
     local subtree = tree:add(zabbix_protocol, buffer(), tree_text)
@@ -471,6 +494,8 @@ local function doDissect(buffer, pktinfo, tree)
         subtree:add(p_agent, 1, "This is an agent connection"):set_generated()
     elseif proxy then
         subtree:add(p_proxy, 1, "This is a proxy connection"):set_generated()
+    elseif sender then
+        subtree:add(p_sender, 1, "This is a sender connection"):set_generated()
     else
         subtree:add("Not agent or proxy"):set_generated():add_proto_expert_info(e_unknown_use)
     end
@@ -515,6 +540,11 @@ local function doDissect(buffer, pktinfo, tree)
         if band(oper_type, T_REQUEST) then subtree:add(p_agent_data,1)
         -- response does not show "agent data", set generated flag
         else subtree:add(p_agent_data,1):set_generated() end
+    end
+    if band(oper_type, T_SENDER_DATA) then
+        if band(oper_type, T_REQUEST) then subtree:add(p_sender_data,1)
+        -- response is generic, set generated flag
+        else subtree:add(p_sender_data,1):set_generated() end
     end
     if band(oper_type, T_PROXY_DATA) then subtree:add(p_proxy_data,1) end
     if band(oper_type, T_PROXY_CONFIG) then subtree:add(p_proxy_config,1) end
@@ -626,6 +656,7 @@ function zabbix_protocol.init()
     timestamps = {}
     agent_names = {}
     proxy_names = {}
+    senders = {}
 end
 
 
