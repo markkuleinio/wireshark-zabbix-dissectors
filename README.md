@@ -1,5 +1,13 @@
 # Zabbix protocol dissectors for Wireshark
 
+> [!IMPORTANT]
+> Wireshark version 4.1.0rc0 and newer (since August 2023) already has Zabbix protocol
+> dissector built in. Using the Lua scripts in this repo are thus no more needed or useful.
+> These scripts will not be developed any further. For any problems or feature requests
+> with the built-in dissector please go to
+> [Wireshark repository in gitlab.com](https://gitlab.com/wireshark/wireshark)
+> and open an issue there.
+
 Experimental Wireshark dissectors for Zabbix protocol. Can be used for inspecting the Zabbix
 server, proxy or agent communication, especially with Zabbix 4.0 and later, where the proxy
 connections use compressed data.
