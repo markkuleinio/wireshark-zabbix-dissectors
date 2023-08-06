@@ -1,9 +1,22 @@
 local plugin_info = {
-    version = "2023-01-01.1",
+    version = "2023-08-06.1",
     author = "Markku Leiniö",
     repository = "https://github.com/markkuleinio/wireshark-zabbix-dissectors",
 }
 set_plugin_info(plugin_info)
+if Dissector.get("zabbix") then
+    local ignore_text = "Your Wireshark version already contains Zabbix protocol dissector compiled in. " ..
+        "Therefore the Zabbix dissector in your local Lua script is ignored:\n" ..
+        debug.getinfo(1, "S").source:sub(2) ..
+        "\nDelete/move the script to remove this message."
+    if gui_enabled() then
+        local win = TextWindow.new("Note from Zabbix Lua dissector")
+        win:set(ignore_text)
+    else
+        print(ignore_text)
+    end
+    return
+end
 local zabbix_protocol = Proto("Zabbix", "Zabbix Protocol")
 -- for some reason the protocol name is shown in UPPERCASE in Protocol column
 -- (and in Proto.name), so let's define a string to override that
